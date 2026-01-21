@@ -15,7 +15,7 @@ class ContainerStore extends HiveStore {
 
   void put(String id, String host) {
     box.put(id, host);
-    updateLastUpdateTs();
+    updateLastUpdateTs(key: id);
   }
 
   ContainerType getType([String id = '']) {
@@ -40,6 +40,6 @@ class ContainerStore extends HiveStore {
     } else {
       box.put(_keyConfig + id, type.toString());
     }
-    updateLastUpdateTs();
+    updateLastUpdateTs(key: _keyConfig + id);
   }
 }

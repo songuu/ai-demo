@@ -3,7 +3,8 @@ import 'dart:io';
 
 import 'package:code_text_field/code_text_field.dart';
 import 'package:computer/computer.dart';
-import 'package:fl_lib/fl_lib.dart';
+import 'package:fl_lib/fl_lib.dart'
+    hide EditorPage, EditorPageArgs, EditorPageRet, EditorPageRetType, TwoLineText;
 import 'package:flutter/material.dart';
 import 'package:flutter_highlight/theme_map.dart';
 import 'package:flutter_highlight/themes/a11y-light.dart';

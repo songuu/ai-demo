@@ -7,6 +7,7 @@ import 'package:server_box/data/provider/server.dart';
 import 'package:server_box/data/res/build_data.dart';
 import 'package:server_box/data/res/store.dart';
 import 'package:server_box/data/res/url.dart';
+import 'package:server_box/view/widget/modern_navigation_bar.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 part 'appbar.dart';
@@ -123,7 +124,7 @@ class _HomePageState extends State<HomePage>
               ? UIs.placeholder
               : ListenableBuilder(
                   listenable: _selectIndex,
-                  builder: (_, __) => _buildBottomBar(ls),
+                  builder: (_, __) => _buildModernBottomBar(ls),
                 );
         },
       ),
@@ -152,6 +153,34 @@ class _HomePageState extends State<HomePage>
           ? NavigationDestinationLabelBehavior.alwaysHide
           : NavigationDestinationLabelBehavior.onlyShowSelected,
       destinations: AppTab.navDestinations,
+    );
+  }
+
+  Widget _buildModernBottomBar(bool ls) {
+    // Check if user prefers modern UI
+    final useModernUI = Stores.setting.colorSeed.fetch() == 0x667EEA || 
+                       !Stores.setting.useSystemPrimaryColor.fetch();
+    
+    if (!useModernUI) {
+      return _buildBottomBar(ls);
+    }
+
+    return ModernNavigationBar(
+      selectedIndex: _selectIndex.value,
+      isLandscape: ls,
+      onDestinationSelected: (int index) {
+        if (_selectIndex.value == index) return;
+        _selectIndex.value = index;
+        _switchingPage = true;
+        _pageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 677),
+          curve: Curves.fastLinearToSlowEaseIn,
+        );
+        Future.delayed(const Duration(milliseconds: 677), () {
+          _switchingPage = false;
+        });
+      },
     );
   }
 
@@ -200,10 +229,9 @@ class _HomePageState extends State<HomePage>
 
   void _goAuth() {
     if (Stores.setting.useBioAuth.fetch()) {
-      if (BioAuthPage.route.isAlreadyIn) return;
-      BioAuthPage.route.go(
+      LocalAuthPage.route.go(
         context,
-        args: BioAuthPageArgs(onAuthSuccess: () => _shouldAuth = false),
+        args: LocalAuthPageArgs(onAuthSuccess: () => _shouldAuth = false),
       );
     }
   }

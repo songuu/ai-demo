@@ -546,7 +546,7 @@ extension _VirtKey on SSHPageState {
     }
   }
 
-  FutureOr<List<String>?> _onKeyboardInteractive(SSHUserInfoRequest req) {
+  FutureOr<List<String>?> _onKeyboardInteractive(dynamic req) {
     return KeybordInteractive.defaultHandle(widget.spi, ctx: context);
   }
 }

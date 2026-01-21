@@ -9,6 +9,13 @@ import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:logging/logging.dart';
 import 'package:server_box/app.dart';
+import 'package:server_box/codecore/model/cod_session.dart';
+import 'package:server_box/codecore/model/cod_provider_config.dart';
+import 'package:server_box/codecore/model/cod_skill.dart';
+import 'package:server_box/codecore/store/cod_session_store.dart';
+import 'package:server_box/codecore/store/cod_settings_store.dart';
+import 'package:server_box/codecore/store/cod_config_store.dart';
+import 'package:server_box/codecore/store/cod_skill_store.dart';
 import 'package:server_box/core/sync.dart';
 import 'package:server_box/data/model/app/menu/server_func.dart';
 import 'package:server_box/data/model/app/net_view.dart';
@@ -71,9 +78,19 @@ Future<void> _initData() async {
   Hive.registerAdapter(ServerFuncBtnAdapter()); // 6
   Hive.registerAdapter(ServerCustomAdapter()); // 7
   Hive.registerAdapter(WakeOnLanCfgAdapter()); // 8
+  Hive.registerAdapter(CodSessionStatusAdapter()); // 9
+  Hive.registerAdapter(CodSessionAdapter()); // 10
+  Hive.registerAdapter(CodProviderConfigAdapter()); // 11
+  Hive.registerAdapter(CodSkillTypeAdapter()); // 12
+  Hive.registerAdapter(CodSkillProviderAdapter()); // 13
+  Hive.registerAdapter(CodSkillAdapter()); // 14
 
   await PrefStore.shared.init(); // Call this before accessing any store
   await Stores.init();
+  await CodSettingsStore.init();
+  await CodSessionStore.init();
+  await CodConfigStore().init();
+  await CodSkillStore.init();
 
   // DO NOT change the order of these providers.
   PrivateKeyProvider.instance.load();

@@ -229,9 +229,20 @@ class SettingStore extends HiveStore {
   /// Record the position and size of the window.
   late final windowState = property<WindowState>(
     'windowState',
-    fromStr: (jsonStr) =>
-        WindowState.fromJson(jsonDecode(jsonStr) as Map<String, dynamic>),
-    toStr: (state) => state == null ? null : jsonEncode(state.toJson()),
+    fromObj: (raw) {
+      if (raw is String) {
+        try {
+          final map = jsonDecode(raw);
+          if (map is Map<String, dynamic>) return WindowState.fromJson(map);
+          if (map is Map) return WindowState.fromJson(Map<String, dynamic>.from(map));
+        } catch (_) {}
+      }
+      if (raw is Map<String, dynamic>) return WindowState.fromJson(raw);
+      if (raw is Map) return WindowState.fromJson(Map<String, dynamic>.from(raw));
+      return null;
+    },
+    // toObj 必须返回 String，否则 HiveStore.set() 会直接存储原对象
+    toObj: (state) => state != null ? jsonEncode(state.toJson()) : null,
   );
 
   late final introVer = propertyDefault('introVer', 0);

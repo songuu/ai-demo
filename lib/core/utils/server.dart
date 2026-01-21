@@ -59,7 +59,7 @@ Future<SSHClient> genClient(
   Spi? jumpSpi,
 
   /// Handle keyboard-interactive authentication
-  FutureOr<List<String>?> Function(SSHUserInfoRequest)? onKeyboardInteractive,
+  FutureOr<List<String>?> Function(dynamic)? onKeyboardInteractive,
 }) async {
   onStatus?.call(GenSSHClientStatus.socket);
 

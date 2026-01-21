@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:fl_lib/fl_lib.dart';
+import 'package:fl_lib/fl_lib.dart' hide TwoLineText;
 import 'package:flutter/material.dart';
 import 'package:server_box/core/extension/context/locale.dart';
 import 'package:server_box/data/model/server/pve.dart';
@@ -236,9 +236,8 @@ final class _PvePageState extends State<PvePage> {
         ],
       ),
       UIs.height7,
-      AvgWidthRow(
-        width: _media.size.width,
-        padding: _kHorziPadding * 2 + 26,
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           PercentCircle(percent: (item.cpu / item.maxcpu) * 100),
           PercentCircle(percent: (item.mem / item.maxmem) * 100),
@@ -313,9 +312,8 @@ final class _PvePageState extends State<PvePage> {
         ],
       ),
       UIs.height7,
-      AvgWidthRow(
-        width: _media.size.width,
-        padding: _kHorziPadding * 2 + 26,
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           PercentCircle(percent: (item.cpu / item.maxcpu) * 100),
           PercentCircle(percent: (item.mem / item.maxmem) * 100),

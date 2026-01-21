@@ -1,6 +1,7 @@
 import 'dart:io';
 
-import 'package:fl_lib/fl_lib.dart';
+import 'package:fl_lib/fl_lib.dart'
+    hide EditorPage, EditorPageArgs, EditorPageRet, EditorPageRetType, TwoLineText;
 import 'package:flutter/material.dart';
 import 'package:server_box/core/extension/context/locale.dart';
 import 'package:server_box/data/model/server/server_private_info.dart';
@@ -283,7 +284,7 @@ class _LocalFilePageState extends State<LocalFilePage>
             icon: const Icon(Icons.open_in_new),
             text: libL10n.open,
             onTap: () {
-              Pfs.share(path: file.absolute.path);
+              Pfs.sharePaths(paths: [file.absolute.path]);
             },
           ),
         ],

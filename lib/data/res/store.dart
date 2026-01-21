@@ -29,18 +29,20 @@ abstract final class Stores {
   }
 
   static DateTime? get lastModTime {
-    DateTime? lastModTime;
+    int? lastTs;
     for (final store in _allBackup) {
-      final last = store.lastUpdateTs;
-      if (last == null) {
-        continue;
-      }
-      if (lastModTime == null) {
-        lastModTime = last;
-      } else if (last.isAfter(lastModTime)) {
-        lastModTime = last;
+      final map = store.lastUpdateTs;
+      if (map == null || map.isEmpty) continue;
+      final maxTs = map.values.fold<int?>(null, (prev, cur) {
+        if (cur is! int) return prev;
+        if (prev == null || cur > prev) return cur;
+        return prev;
+      });
+      if (maxTs == null) continue;
+      if (lastTs == null || maxTs > lastTs) {
+        lastTs = maxTs;
       }
     }
-    return lastModTime;
+    return lastTs == null ? null : DateTime.fromMillisecondsSinceEpoch(lastTs);
   }
 }

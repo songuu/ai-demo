@@ -25,6 +25,40 @@
                 "--cache-sksl",
                 // "--purge-persistent-cache"
             ]
+        },
+        {
+            "name": "Flutter Windows (Debug)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "deviceId": "windows",
+            "args": [
+                "-d",
+                "windows"
+            ]
+        },
+        {
+            "name": "Flutter Windows (Profile)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "deviceId": "windows",
+            "args": [
+                "-d",
+                "windows",
+                "--cache-sksl"
+            ]
+        },
+        {
+            "name": "Flutter Windows (Release)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "deviceId": "windows",
+            "args": [
+                "-d",
+                "windows"
+            ]
         }
     ]
 }

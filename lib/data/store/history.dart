@@ -1,14 +1,14 @@
 import 'package:fl_lib/fl_lib.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce/hive.dart' as hive;
 
 /// index from 0 -> n : latest -> oldest
 class _ListHistory {
   final List _history;
   final String _name;
-  final Box _box;
+  final hive.Box _box;
 
   _ListHistory({
-    required Box box,
+    required hive.Box box,
     required String name,
   })  : _box = box,
         _name = name,
@@ -26,10 +26,10 @@ class _ListHistory {
 class _MapHistory {
   final Map _history;
   final String _name;
-  final Box _box;
+  final hive.Box _box;
 
   _MapHistory({
-    required Box box,
+    required hive.Box box,
     required String name,
   })  : _box = box,
         _name = name,

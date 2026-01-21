@@ -34,7 +34,7 @@ class _IOSSettingsPageState extends State<IOSSettingsPage> {
           _buildPushToken(),
           _buildAutoUpdateHomeWidget(),
           _buildWatchApp(),
-          if (BioAuth.isPlatformSupported)
+          if (isIOS)
             PlatformPublicSettings.buildBioAuth(),
         ].map((e) => CardX(child: e)).toList(),
       ),

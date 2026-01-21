@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:fl_lib/fl_lib.dart';
+import 'package:fl_lib/fl_lib.dart'
+    hide RNodes, EditorPage, EditorPageArgs, EditorPageRet, EditorPageRetType, TwoLineText;
 import 'package:flutter/material.dart';
 import 'package:flutter_highlight/theme_map.dart';
 import 'package:server_box/data/store/setting.dart';
@@ -205,7 +206,6 @@ final class _AppSettingsPageState extends State<AppSettingsPage> {
   @override
   Widget build(BuildContext context) {
     return MultiList(
-      thumbVisibility: true,
       children: [
         [const CenterGreyTitle('App'), _buildApp()],
         [CenterGreyTitle(l10n.server), _buildServer()],

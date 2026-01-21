@@ -7,7 +7,7 @@ const bakSync = BakSyncer._();
 
 final icloud = ICloud(containerId: 'iCloud.tech.lolli.serverbox');
 
-final class BakSyncer extends SyncIface<Backup> {
+final class BakSyncer extends SyncIface<Backup, Object> {
   const BakSyncer._() : super();
 
   @override
@@ -25,7 +25,7 @@ final class BakSyncer extends SyncIface<Backup> {
   }
 
   @override
-  RemoteStorage? get remoteStorage {
+  RemoteStorage<Object>? get remoteStorage {
     final icloudEnabled = PrefProps.icloudSync.get();
     if (icloudEnabled) return icloud;
 

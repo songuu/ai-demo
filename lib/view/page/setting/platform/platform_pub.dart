@@ -5,7 +5,7 @@ import 'package:server_box/data/res/store.dart';
 abstract final class PlatformPublicSettings {
   static Widget buildBioAuth() {
     return FutureWidget<bool>(
-      future: BioAuth.isAvail,
+      future: LocalAuth.isAvail,
       loading: ListTile(
         title: Text(libL10n.bioAuth),
         subtitle: const Text('...', style: UIs.textGrey),
@@ -32,7 +32,7 @@ abstract final class PlatformPublicSettings {
                       return;
                     }
                     // Only auth when turn off (val == false)
-                    final result = await BioAuth.goWithResult();
+                    final result = await LocalAuth.goWithResult();
                     // If failed, turn on again
                     if (result != AuthResult.success) {
                       Stores.setting.useBioAuth.put(true);

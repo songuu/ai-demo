@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:fl_lib/fl_lib.dart';
+import 'package:fl_lib/fl_lib.dart' hide TwoLineText;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:server_box/core/extension/context/locale.dart';

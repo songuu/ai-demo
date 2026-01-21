@@ -13,7 +13,7 @@ import 'package:server_box/data/provider/snippet.dart';
 import 'package:server_box/data/res/misc.dart';
 import 'package:server_box/data/res/store.dart';
 import 'package:icons_plus/icons_plus.dart';
-import 'package:webdav_client/webdav_client.dart';
+import 'package:webdav_client_plus/webdav_client_plus.dart';
 
 class BackupPage extends StatefulWidget {
   const BackupPage({super.key});
@@ -85,7 +85,7 @@ final class _BackupPageState extends State<BackupPage>
             trailing: const Icon(Icons.save),
             onTap: () async {
               final path = await Backup.backup();
-              await Pfs.share(path: path);
+              await Pfs.sharePaths(paths: [path]);
             },
           ),
           ListTile(
@@ -416,7 +416,7 @@ final class _BackupPageState extends State<BackupPage>
         await Webdav.test(url_, user_, pwd_);
         context.showSnackBar(libL10n.success);
 
-        Webdav.shared.client = WebdavClient(url: url_, user: user_, pwd: pwd_);
+        // 设置 Webdav 配置，Webdav.shared 将使用这些新配置
         PrefProps.webdavUrl.set(url_);
         PrefProps.webdavUser.set(user_);
         PrefProps.webdavPwd.set(pwd_);

@@ -1,5 +1,5 @@
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:fl_lib/fl_lib.dart';
+import 'package:fl_lib/fl_lib.dart' hide RNodes;
 import 'package:fl_lib/generated/l10n/lib_l10n.dart';
 import 'package:flutter/material.dart';
 
@@ -9,6 +9,7 @@ import 'package:server_box/data/res/rebuild.dart';
 import 'package:server_box/data/res/store.dart';
 import 'package:server_box/generated/l10n/l10n.dart';
 import 'package:server_box/view/page/home/home.dart';
+import 'package:server_box/view/widget/modern_theme.dart';
 import 'package:icons_plus/icons_plus.dart';
 
 part 'intro.dart';
@@ -74,6 +75,15 @@ class MyApp extends StatelessWidget {
     };
     final locale = Stores.setting.locale.fetch().toLocale;
 
+    // Use modern themes if user preference allows it
+    final useModernTheme = Stores.setting.colorSeed.fetch() == 0x667EEA || 
+                          !Stores.setting.useSystemPrimaryColor.fetch();
+    
+    ThemeData lightTheme = useModernTheme ? ModernTheme.lightTheme : light.fixWindowsFont;
+    ThemeData darkTheme = useModernTheme 
+        ? (tMode == 3 ? ModernTheme.amoledTheme : ModernTheme.darkTheme)
+        : (tMode < 3 ? dark : dark.toAmoled).fixWindowsFont;
+
     return MaterialApp(
       key: ValueKey(locale),
       locale: locale,
@@ -86,8 +96,8 @@ class MyApp extends StatelessWidget {
       navigatorObservers: [AppRouteObserver.instance],
       title: BuildData.name,
       themeMode: themeMode,
-      theme: light.fixWindowsFont,
-      darkTheme: (tMode < 3 ? dark : dark.toAmoled).fixWindowsFont,
+      theme: lightTheme,
+      darkTheme: darkTheme,
       home: VirtualWindowFrame(
         child: Builder(
           builder: (context) {

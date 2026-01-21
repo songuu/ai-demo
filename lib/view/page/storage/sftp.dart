@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dartssh2/dartssh2.dart';
-import 'package:fl_lib/fl_lib.dart';
+import 'package:fl_lib/fl_lib.dart'
+    hide EditorPage, EditorPageArgs, EditorPageRet, EditorPageRetType, TwoLineText;
 import 'package:flutter/material.dart';
 import 'package:server_box/core/extension/context/locale.dart';
 import 'package:server_box/core/extension/sftpfile.dart';
