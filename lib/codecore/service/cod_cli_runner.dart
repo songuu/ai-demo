@@ -15,7 +15,6 @@ import 'package:server_box/codecore/service/cod_launcher.dart';
 
 /// CLI运行器
 /// 负责启动和管理CLI进程
-/// 参考: https://github.com/loocor/codmate
 class CodCliRunner {
   CodCliRunner._();
 
@@ -31,7 +30,8 @@ class CodCliRunner {
 
     // 解析命令和参数
     final resolvedCmd = CodSettingsStore.resolveCli(session.provider);
-    final executable = session.command.isNotEmpty ? session.command : resolvedCmd;
+    final executable =
+        session.command.isNotEmpty ? session.command : resolvedCmd;
     final args = session.args;
 
     // 解析工作目录
@@ -46,11 +46,13 @@ class CodCliRunner {
         executable,
         args,
         workingDirectory: workingDir,
-        environment: CodLauncher.getPatchedEnvironment(provider: session.provider),
+        environment:
+            CodLauncher.getPatchedEnvironment(provider: session.provider),
         runInShell: true,
       );
     } catch (e) {
-      await logFile.writeAsString('[launcher error] $e\n', mode: FileMode.append);
+      await logFile.writeAsString('[launcher error] $e\n',
+          mode: FileMode.append);
       final failed = session.copyWith(
         status: CodSessionStatus.failed,
         exitCode: -1,
@@ -77,7 +79,8 @@ class CodCliRunner {
   }
 
   /// 解析工作目录
-  static Future<String?> _resolveWorkingDirectory(CodSession session, File logFile) async {
+  static Future<String?> _resolveWorkingDirectory(
+      CodSession session, File logFile) async {
     String? workingDir;
 
     if (session.cwd.isNotEmpty) {
@@ -134,7 +137,7 @@ class CodCliRunner {
   ) async {
     final startTime = DateTime.now().toIso8601String();
     final cmdLine = '$executable ${args.join(' ')}';
-    
+
     await logFile.writeAsString(
       '''
 === Session Started ===
@@ -183,12 +186,13 @@ Working Directory: ${workingDir ?? '(default)'}
     process.exitCode.then((code) async {
       final endTime = DateTime.now().toIso8601String();
       final done = runningSession.copyWith(
-        status: code == 0 ? CodSessionStatus.completed : CodSessionStatus.failed,
+        status:
+            code == 0 ? CodSessionStatus.completed : CodSessionStatus.failed,
         exitCode: code,
         updatedAt: DateTime.now(),
       );
       await CodSessionStore.put(done);
-      
+
       logFile.writeAsStringSync(
         '''
 
@@ -204,13 +208,13 @@ Status: ${code == 0 ? 'Completed' : 'Failed'}
   }
 
   /// 在外部终端中运行会话（用于交互式会话）
-  /// 参考CodMate: 可以在 Terminal.app / iTerm2 / Warp / Windows Terminal 中启动
   static Future<bool> runInTerminal(
     CodSession session, {
     String? terminalApp,
   }) async {
     final command = buildResumeCommand(session);
-    final workingDir = session.cwd.isNotEmpty ? session.cwd : Directory.current.path;
+    final workingDir =
+        session.cwd.isNotEmpty ? session.cwd : Directory.current.path;
 
     try {
       if (Platform.isWindows) {
@@ -226,9 +230,10 @@ Status: ${code == 0 ? 'Completed' : 'Failed'}
   }
 
   /// Windows 终端支持
-  static Future<bool> _runInWindowsTerminal(String command, String workingDir, String? terminalApp) async {
+  static Future<bool> _runInWindowsTerminal(
+      String command, String workingDir, String? terminalApp) async {
     final terminal = terminalApp?.toLowerCase() ?? 'cmd';
-    
+
     switch (terminal) {
       case 'powershell':
         // 使用 PowerShell
@@ -240,7 +245,7 @@ Status: ${code == 0 ? 'Completed' : 'Failed'}
           environment: CodLauncher.getPatchedEnvironment(),
         );
         break;
-      
+
       case 'windows terminal':
       case 'wt':
         // 使用 Windows Terminal
@@ -252,7 +257,7 @@ Status: ${code == 0 ? 'Completed' : 'Failed'}
           environment: CodLauncher.getPatchedEnvironment(),
         );
         break;
-      
+
       case 'cmd':
       default:
         // 使用 cmd
@@ -265,14 +270,15 @@ Status: ${code == 0 ? 'Completed' : 'Failed'}
         );
         break;
     }
-    
+
     return true;
   }
 
   /// macOS 终端支持
-  static Future<bool> _runInMacTerminal(String command, String workingDir, String? terminalApp) async {
+  static Future<bool> _runInMacTerminal(
+      String command, String workingDir, String? terminalApp) async {
     final terminal = terminalApp?.toLowerCase() ?? 'terminal';
-    
+
     switch (terminal) {
       case 'iterm':
       case 'iterm2':
@@ -282,16 +288,13 @@ Status: ${code == 0 ? 'Completed' : 'Failed'}
           'tell application "iTerm" to create window with default profile command "cd \\"$workingDir\\" && $command"',
         ]);
         break;
-      
+
       case 'warp':
         // 使用 Warp
-        await Process.run('open', [
-          '-a', 'Warp', 
-          '--args', 
-          '-e', 'cd "$workingDir" && $command'
-        ]);
+        await Process.run('open',
+            ['-a', 'Warp', '--args', '-e', 'cd "$workingDir" && $command']);
         break;
-      
+
       case 'terminal':
       default:
         // 使用 Terminal.app
@@ -301,41 +304,60 @@ Status: ${code == 0 ? 'Completed' : 'Failed'}
         ]);
         break;
     }
-    
+
     return true;
   }
 
   /// Linux 终端支持
-  static Future<bool> _runInLinuxTerminal(String command, String workingDir, String? terminalApp) async {
+  static Future<bool> _runInLinuxTerminal(
+      String command, String workingDir, String? terminalApp) async {
     final terminal = terminalApp?.toLowerCase() ?? 'gnome-terminal';
-    
+
     switch (terminal) {
       case 'konsole':
         await Process.start(
           'konsole',
-          ['--workdir', workingDir, '-e', 'bash', '-c', '$command; read -p "Press enter to close..."'],
+          [
+            '--workdir',
+            workingDir,
+            '-e',
+            'bash',
+            '-c',
+            '$command; read -p "Press enter to close..."'
+          ],
           environment: CodLauncher.getPatchedEnvironment(),
         );
         break;
-      
+
       case 'xterm':
         await Process.start(
           'xterm',
-          ['-e', 'bash', '-c', 'cd "$workingDir" && $command; read -p "Press enter to close..."'],
+          [
+            '-e',
+            'bash',
+            '-c',
+            'cd "$workingDir" && $command; read -p "Press enter to close..."'
+          ],
           environment: CodLauncher.getPatchedEnvironment(),
         );
         break;
-      
+
       case 'gnome-terminal':
       default:
         await Process.start(
           'gnome-terminal',
-          ['--working-directory=$workingDir', '--', 'bash', '-c', '$command; read -p "Press enter to close..."'],
+          [
+            '--working-directory=$workingDir',
+            '--',
+            'bash',
+            '-c',
+            '$command; read -p "Press enter to close..."'
+          ],
           environment: CodLauncher.getPatchedEnvironment(),
         );
         break;
     }
-    
+
     return true;
   }
 
@@ -343,14 +365,15 @@ Status: ${code == 0 ? 'Completed' : 'Failed'}
   /// 用于复制到剪贴板或在终端中执行
   static String buildResumeCommand(CodSession session) {
     final resolvedCmd = CodSettingsStore.resolveCli(session.provider);
-    final executable = session.command.isNotEmpty ? session.command : resolvedCmd;
-    
+    final executable =
+        session.command.isNotEmpty ? session.command : resolvedCmd;
+
     // 根据提供商构建命令
     switch (session.provider.toLowerCase()) {
       case 'claude':
         // Claude Code: claude --continue
         return '$executable --continue';
-      
+
       case 'codex':
         // Codex: codex resume <id> 或 codex chat
         final originalId = _extractOriginalId(session.id, 'codex');
@@ -358,7 +381,7 @@ Status: ${code == 0 ? 'Completed' : 'Failed'}
           return '$executable resume $originalId';
         }
         return '$executable chat';
-      
+
       case 'gemini':
         // Gemini: gemini resume <id> 或 gemini chat
         final originalId = _extractOriginalId(session.id, 'gemini');
@@ -366,7 +389,7 @@ Status: ${code == 0 ? 'Completed' : 'Failed'}
           return '$executable resume $originalId';
         }
         return '$executable chat';
-      
+
       default:
         return '$executable ${session.args.join(' ')}';
     }
@@ -375,7 +398,7 @@ Status: ${code == 0 ? 'Completed' : 'Failed'}
   /// 构建新会话命令
   static String buildNewSessionCommand(String provider, {String? workingDir}) {
     final executable = CodSettingsStore.resolveCli(provider);
-    
+
     switch (provider.toLowerCase()) {
       case 'claude':
         return executable;
@@ -400,19 +423,19 @@ Status: ${code == 0 ? 'Completed' : 'Failed'}
     if (!importedId.startsWith(prefix)) {
       return importedId;
     }
-    
+
     final id = importedId.substring(prefix.length);
-    
+
     // 检查是否是UUID格式
     if (_looksLikeUuid(id)) {
       return id;
     }
-    
+
     // 检查是否是时间戳格式
     if (RegExp(r'^\d{13}$').hasMatch(id)) {
       return id;
     }
-    
+
     // 对于项目格式的ID，返回空字符串
     return '';
   }
@@ -421,8 +444,8 @@ Status: ${code == 0 ? 'Completed' : 'Failed'}
   static bool _looksLikeUuid(String str) {
     if (str.length == 36 && str.contains('-')) {
       return RegExp(
-        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-      ).hasMatch(str);
+              r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(str);
     }
     if (str.length == 32) {
       return RegExp(r'^[0-9a-fA-F]{32}$').hasMatch(str);
@@ -444,10 +467,12 @@ Status: ${code == 0 ? 'Completed' : 'Failed'}
   /// 获取命令的完整路径信息（用于调试）
   static Future<CommandInfo> getCommandInfo(CodSession session) async {
     final resolvedCmd = CodSettingsStore.resolveCli(session.provider);
-    final executable = session.command.isNotEmpty ? session.command : resolvedCmd;
+    final executable =
+        session.command.isNotEmpty ? session.command : resolvedCmd;
     final args = session.args;
-    final workingDir = session.cwd.isNotEmpty ? session.cwd : Directory.current.path;
-    
+    final workingDir =
+        session.cwd.isNotEmpty ? session.cwd : Directory.current.path;
+
     // 尝试查找可执行文件的完整路径
     String? fullPath;
     try {
@@ -461,7 +486,7 @@ Status: ${code == 0 ? 'Completed' : 'Failed'}
         fullPath = result.stdout.toString().trim().split('\n').first;
       }
     } catch (_) {}
-    
+
     return CommandInfo(
       executable: executable,
       fullPath: fullPath,

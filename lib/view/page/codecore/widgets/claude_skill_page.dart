@@ -5,6 +5,7 @@ import 'package:server_box/codecore/service/claude_skill_service.dart';
 
 /// Claude Code Skills 管理页面
 /// 管理本地 ~/.claude/skills/ 目录下的 skills
+/// 参考: https://code.claude.com/docs/en/skills
 class ClaudeSkillPage extends StatefulWidget {
   const ClaudeSkillPage({super.key});
 
@@ -203,7 +204,7 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
           const SizedBox(width: 8),
           // 新建按钮
           ElevatedButton.icon(
-            onPressed: () => _showCreateDialog(),
+            onPressed: () => _showSkillEditor(null),
             icon: const Icon(Icons.add, size: 16),
             label: const Text('新建 Skill'),
             style: ElevatedButton.styleFrom(
@@ -432,6 +433,14 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
                           ),
                         ),
                       ],
+                      if (skill.supportingFiles.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Icon(Icons.attach_file, size: 12, color: Colors.grey.shade500),
+                        Text(
+                          '${skill.supportingFiles.length}',
+                          style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
+                        ),
+                      ],
                     ],
                   ),
                   if (skill.description.isNotEmpty) ...[
@@ -540,7 +549,7 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
             IconButton(
               icon: const Icon(Icons.edit_outlined, color: Colors.blue),
               tooltip: '编辑',
-              onPressed: () => _showEditDialog(skill),
+              onPressed: () => _showSkillEditor(skill),
             ),
             IconButton(
               icon: const Icon(Icons.content_copy, color: Colors.grey),
@@ -609,6 +618,14 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
               skill.disableModelInvocation ? 'true' : 'false',
               skill.disableModelInvocation ? Colors.red : Colors.green,
             ),
+            if (skill.agent != null && skill.agent!.isNotEmpty)
+              _buildConfigChip('agent', skill.agent!, Colors.cyan),
+            if (skill.allowMultipleTurns != null)
+              _buildConfigChip(
+                'allow-multiple-turns',
+                skill.allowMultipleTurns! ? 'true' : 'false',
+                Colors.teal,
+              ),
             if (skill.allowedTools != null && skill.allowedTools!.isNotEmpty)
               _buildConfigChip(
                 'allowed-tools',
@@ -672,15 +689,62 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
   }
 
   Widget _buildSupportingFilesSection(ClaudeSkill skill) {
+    final scripts = skill.scripts;
+    final examples = skill.examples;
+    final templates = skill.templates;
+    final others = skill.supportingFiles
+        .where((f) => f.type == SkillFileType.other)
+        .toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('支持文件'),
+        _buildSectionTitle('支持文件 (${skill.supportingFiles.length})'),
         const SizedBox(height: 12),
+        
+        // Scripts
+        if (scripts.isNotEmpty) ...[
+          _buildFileCategory('📜 脚本 (scripts/)', scripts, skill),
+          const SizedBox(height: 12),
+        ],
+        
+        // Examples
+        if (examples.isNotEmpty) ...[
+          _buildFileCategory('📝 示例 (examples/)', examples, skill),
+          const SizedBox(height: 12),
+        ],
+        
+        // Templates
+        if (templates.isNotEmpty) ...[
+          _buildFileCategory('📄 模板', templates, skill),
+          const SizedBox(height: 12),
+        ],
+        
+        // Others
+        if (others.isNotEmpty) ...[
+          _buildFileCategory('📎 其他文件', others, skill),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildFileCategory(String title, List<SkillFile> files, ClaudeSkill skill) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: Colors.grey.shade400,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: skill.supportingFiles.map((file) {
+          children: files.map((file) {
             return InkWell(
               onTap: () => _showFileContent(skill, file),
               borderRadius: BorderRadius.circular(6),
@@ -694,14 +758,10 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      _getFileIcon(file),
-                      color: Colors.grey.shade400,
-                      size: 16,
-                    ),
+                    Text(file.icon, style: const TextStyle(fontSize: 14)),
                     const SizedBox(width: 8),
                     Text(
-                      file,
+                      file.relativePath,
                       style: TextStyle(
                         color: Colors.grey.shade300,
                         fontSize: 12,
@@ -784,31 +844,16 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
             '$label: ',
             style: TextStyle(color: Colors.grey.shade400, fontSize: 11),
           ),
-          Text(
-            value,
-            style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+          Flexible(
+            child: Text(
+              value,
+              style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
     );
-  }
-
-  IconData _getFileIcon(String fileName) {
-    final ext = fileName.split('.').last.toLowerCase();
-    switch (ext) {
-      case 'md':
-        return Icons.description;
-      case 'sh':
-      case 'bash':
-        return Icons.terminal;
-      case 'py':
-        return Icons.code;
-      case 'js':
-      case 'ts':
-        return Icons.javascript;
-      default:
-        return Icons.insert_drive_file;
-    }
   }
 
   String _formatDate(DateTime date) {
@@ -818,299 +863,19 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
 
   // ============ 操作方法 ============
 
-  Future<void> _showCreateDialog() async {
-    final nameCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final contentCtrl = TextEditingController(text: '''当用户请求时，执行以下操作：
-
-1. 第一步
-2. 第二步
-3. 第三步
-
-请确保遵循这些指南。''');
-    String skillContext = 'inline';
-    bool disableModelInvocation = false;
-
-    final result = await showDialog<bool>(
-      context: this.context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF252525),
-          title: const Text('新建 Skill', style: TextStyle(color: Colors.white)),
-          content: SizedBox(
-            width: 500,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDialogField('名称 *', nameCtrl, 
-                    hintText: 'my-skill（只能包含字母、数字、连字符）'),
-                  const SizedBox(height: 16),
-                  _buildDialogField('描述', descCtrl, 
-                    hintText: '简短描述这个 Skill 的用途'),
-                  const SizedBox(height: 16),
-                  _buildDialogField('内容 *', contentCtrl, 
-                    hintText: 'Skill 指令内容...', maxLines: 8),
-                  const SizedBox(height: 16),
-                  Text('上下文设置', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: ['inline', 'fork', 'none'].map((c) {
-                      return ChoiceChip(
-                        label: Text(c),
-                        selected: skillContext == c,
-                        onSelected: (selected) {
-                          if (selected) setDialogState(() => skillContext = c);
-                        },
-                        selectedColor: Colors.orange,
-                        labelStyle: TextStyle(
-                          color: skillContext == c ? Colors.white : Colors.grey,
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: disableModelInvocation,
-                        onChanged: (v) => setDialogState(() => disableModelInvocation = v ?? false),
-                        activeColor: Colors.orange,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '禁用模型自动调用（仅手动 /command 触发）',
-                          style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-              child: const Text('创建'),
-            ),
-          ],
-        ),
+  /// 显示 Skill 编辑器（新建/编辑）
+  Future<void> _showSkillEditor(ClaudeSkill? existingSkill) async {
+    final result = await Navigator.of(context).push<ClaudeSkill>(
+      MaterialPageRoute(
+        builder: (context) => _SkillEditorPage(skill: existingSkill),
+        fullscreenDialog: true,
       ),
     );
 
-    if (result == true) {
-      final name = nameCtrl.text.trim();
-      final desc = descCtrl.text.trim();
-      final skillContent = contentCtrl.text.trim();
-
-      if (name.isEmpty || skillContent.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('名称和内容不能为空')),
-        );
-        return;
-      }
-
-      if (!ClaudeSkillService.isValidSkillName(name)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('名称只能包含字母、数字、连字符和下划线，且以字母开头')),
-        );
-        return;
-      }
-
-      try {
-        final skill = await ClaudeSkillService.createSkill(
-          name: name,
-          description: desc,
-          content: skillContent,
-          context: skillContext,
-          disableModelInvocation: disableModelInvocation,
-        );
-        await _loadSkills();
-        setState(() => _selectedSkill = skill);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('已创建 Skill: /$name')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('创建失败: $e')),
-          );
-        }
-      }
+    if (result != null) {
+      await _loadSkills();
+      setState(() => _selectedSkill = result);
     }
-
-    nameCtrl.dispose();
-    descCtrl.dispose();
-    contentCtrl.dispose();
-  }
-
-  Future<void> _showEditDialog(ClaudeSkill skill) async {
-    final nameCtrl = TextEditingController(text: skill.name);
-    final descCtrl = TextEditingController(text: skill.description);
-    final contentCtrl = TextEditingController(text: skill.content);
-    String skillContext = skill.context ?? 'inline';
-    bool disableModelInvocation = skill.disableModelInvocation;
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF252525),
-          title: const Text('编辑 Skill', style: TextStyle(color: Colors.white)),
-          content: SizedBox(
-            width: 500,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDialogField('名称', nameCtrl, enabled: false),
-                  const SizedBox(height: 16),
-                  _buildDialogField('描述', descCtrl, hintText: '简短描述'),
-                  const SizedBox(height: 16),
-                  _buildDialogField('内容 *', contentCtrl, maxLines: 10),
-                  const SizedBox(height: 16),
-                  Text('上下文设置', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: ['inline', 'fork', 'none'].map((c) {
-                      return ChoiceChip(
-                        label: Text(c),
-                        selected: skillContext == c,
-                        onSelected: (selected) {
-                          if (selected) setDialogState(() => skillContext = c);
-                        },
-                        selectedColor: Colors.orange,
-                        labelStyle: TextStyle(
-                          color: skillContext == c ? Colors.white : Colors.grey,
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: disableModelInvocation,
-                        onChanged: (v) => setDialogState(() => disableModelInvocation = v ?? false),
-                        activeColor: Colors.orange,
-                      ),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          '禁用模型自动调用',
-                          style: TextStyle(color: Colors.grey, fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-              child: const Text('保存'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (result == true) {
-      try {
-        final updatedSkill = skill.copyWith(
-          description: descCtrl.text.trim(),
-          content: contentCtrl.text.trim(),
-          context: skillContext,
-          disableModelInvocation: disableModelInvocation,
-        );
-        final saved = await ClaudeSkillService.updateSkill(updatedSkill);
-        await _loadSkills();
-        setState(() => _selectedSkill = saved);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Skill 已更新')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('更新失败: $e')),
-          );
-        }
-      }
-    }
-
-    nameCtrl.dispose();
-    descCtrl.dispose();
-    contentCtrl.dispose();
-  }
-
-  Widget _buildDialogField(
-    String label,
-    TextEditingController controller, {
-    String? hintText,
-    int maxLines = 1,
-    bool enabled = true,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          enabled: enabled,
-          maxLines: maxLines,
-          style: TextStyle(
-            color: enabled ? Colors.white : Colors.grey,
-            fontSize: 13,
-            fontFamily: maxLines > 1 ? 'monospace' : null,
-          ),
-          decoration: InputDecoration(
-            hintText: hintText,
-            hintStyle: TextStyle(color: Colors.grey.shade600),
-            filled: true,
-            fillColor: const Color(0xFF1A1A1A),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade700),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade700),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.orange),
-            ),
-            disabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade800),
-            ),
-          ),
-        ),
-      ],
-    );
   }
 
   Future<void> _duplicateSkill(ClaudeSkill skill) async {
@@ -1121,7 +886,29 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF252525),
         title: const Text('复制 Skill', style: TextStyle(color: Colors.white)),
-        content: _buildDialogField('新名称', nameCtrl),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '新名称',
+              style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: nameCtrl,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFF1A1A1A),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade700),
+                ),
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -1138,9 +925,11 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
 
     if (result != null && result.isNotEmpty) {
       if (!ClaudeSkillService.isValidSkillName(result)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('名称格式不正确')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('名称格式不正确')),
+          );
+        }
         return;
       }
 
@@ -1209,18 +998,30 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
     }
   }
 
-  Future<void> _showFileContent(ClaudeSkill skill, String fileName) async {
+  Future<void> _showFileContent(ClaudeSkill skill, SkillFile file) async {
     try {
-      final content = await ClaudeSkillService.readSupportingFile(skill, fileName);
+      final content = await file.readContent();
       if (mounted) {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: const Color(0xFF252525),
-            title: Text(fileName, style: const TextStyle(color: Colors.white)),
+            title: Row(
+              children: [
+                Text(file.icon, style: const TextStyle(fontSize: 18)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    file.relativePath,
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
             content: SizedBox(
-              width: 600,
-              height: 400,
+              width: 700,
+              height: 500,
               child: SingleChildScrollView(
                 child: Container(
                   padding: const EdgeInsets.all(16),
@@ -1234,6 +1035,7 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
                       color: Color(0xFFE6EDF3),
                       fontSize: 12,
                       fontFamily: 'monospace',
+                      height: 1.5,
                     ),
                   ),
                 ),
@@ -1247,7 +1049,7 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
                     const SnackBar(content: Text('已复制文件内容')),
                   );
                 },
-                child: const Text('复制'),
+                child: const Text('复制内容'),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
@@ -1262,6 +1064,1271 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('读取文件失败: $e')),
         );
+      }
+    }
+  }
+}
+
+// ============ Skill 编辑器页面 ============
+
+class _SkillEditorPage extends StatefulWidget {
+  final ClaudeSkill? skill;
+
+  const _SkillEditorPage({this.skill});
+
+  @override
+  State<_SkillEditorPage> createState() => _SkillEditorPageState();
+}
+
+class _SkillEditorPageState extends State<_SkillEditorPage>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabCtrl;
+  bool _isLoading = false;
+
+  // 基本信息
+  final _nameCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  final _contentCtrl = TextEditingController();
+
+  // Frontmatter 配置
+  String _context = 'inline';
+  bool _disableModelInvocation = false;
+  final _allowedToolsCtrl = TextEditingController();
+  final _disallowedToolsCtrl = TextEditingController();
+  final _agentCtrl = TextEditingController();
+  bool? _allowMultipleTurns;
+
+  // 支持文件
+  List<NewSkillFile> _newFiles = [];
+  List<String> _deleteFiles = [];
+  List<SkillFile> _existingFiles = [];
+
+  bool get isEditing => widget.skill != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabCtrl = TabController(length: 3, vsync: this);
+
+    if (widget.skill != null) {
+      final skill = widget.skill!;
+      _nameCtrl.text = skill.name;
+      _descCtrl.text = skill.description;
+      _contentCtrl.text = skill.content;
+      _context = skill.context ?? 'inline';
+      _disableModelInvocation = skill.disableModelInvocation;
+      _allowedToolsCtrl.text = skill.allowedTools?.join(', ') ?? '';
+      _disallowedToolsCtrl.text = skill.disallowedTools?.join(', ') ?? '';
+      _agentCtrl.text = skill.agent ?? '';
+      _allowMultipleTurns = skill.allowMultipleTurns;
+      _existingFiles = List.from(skill.supportingFiles);
+    } else {
+      _contentCtrl.text = '''# Skill 指令
+
+当用户请求时，执行以下操作：
+
+1. **第一步**: 描述具体操作
+2. **第二步**: 描述具体操作
+3. **第三步**: 描述具体操作
+
+## 注意事项
+
+- 重要提示 1
+- 重要提示 2
+
+请确保遵循这些指南。''';
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    _nameCtrl.dispose();
+    _descCtrl.dispose();
+    _contentCtrl.dispose();
+    _allowedToolsCtrl.dispose();
+    _disallowedToolsCtrl.dispose();
+    _agentCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF1A1A1A),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF252525),
+        title: Text(
+          isEditing ? '编辑 Skill: ${widget.skill!.name}' : '新建 Skill',
+          style: const TextStyle(fontSize: 16),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: [
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: ElevatedButton.icon(
+                onPressed: _save,
+                icon: const Icon(Icons.save, size: 18),
+                label: Text(isEditing ? '保存' : '创建'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+        ],
+        bottom: TabBar(
+          controller: _tabCtrl,
+          indicatorColor: Colors.orange,
+          labelColor: Colors.orange,
+          unselectedLabelColor: Colors.grey,
+          tabs: const [
+            Tab(text: '基本信息'),
+            Tab(text: 'Frontmatter 配置'),
+            Tab(text: '支持文件'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabCtrl,
+        children: [
+          _buildBasicInfoTab(),
+          _buildFrontmatterTab(),
+          _buildFilesTab(),
+        ],
+      ),
+    );
+  }
+
+  /// 基本信息标签页
+  Widget _buildBasicInfoTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 名称
+          _buildField(
+            '名称 *',
+            _nameCtrl,
+            hintText: 'my-skill（只能包含字母、数字、连字符和下划线）',
+            enabled: !isEditing,
+            helperText: '名称将成为 /slash-command，例如 /my-skill',
+          ),
+          const SizedBox(height: 24),
+
+          // 描述
+          _buildField(
+            '描述',
+            _descCtrl,
+            hintText: '简短描述这个 Skill 的用途（帮助 Claude 决定何时自动调用）',
+            maxLines: 2,
+          ),
+          const SizedBox(height: 24),
+
+          // 内容
+          _buildSectionHeader(
+            'SKILL.md 内容 *',
+            subtitle: 'Skill 的主要指令内容，使用 Markdown 格式',
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 400,
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D1117),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF30363D)),
+            ),
+            child: TextField(
+              controller: _contentCtrl,
+              maxLines: null,
+              expands: true,
+              style: const TextStyle(
+                color: Color(0xFFE6EDF3),
+                fontSize: 13,
+                fontFamily: 'monospace',
+                height: 1.5,
+              ),
+              decoration: const InputDecoration(
+                contentPadding: EdgeInsets.all(16),
+                border: InputBorder.none,
+                hintText: '输入 Skill 指令内容...',
+                hintStyle: TextStyle(color: Color(0xFF6E7681)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Frontmatter 配置标签页
+  Widget _buildFrontmatterTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Context 设置
+          _buildSectionHeader(
+            'Context (上下文设置)',
+            subtitle: '控制 Skill 如何在对话中运行',
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              _buildContextOption(
+                'inline',
+                'Inline (默认)',
+                '内容直接添加到当前会话上下文',
+                Icons.layers,
+              ),
+              _buildContextOption(
+                'fork',
+                'Fork',
+                '在子代理中运行，隔离上下文',
+                Icons.call_split,
+              ),
+              _buildContextOption(
+                'none',
+                'None',
+                '不添加任何上下文',
+                Icons.block,
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+
+          // 调用控制
+          _buildSectionHeader(
+            '调用控制',
+            subtitle: '控制 Skill 如何被触发',
+          ),
+          const SizedBox(height: 12),
+          _buildSwitchTile(
+            'disable-model-invocation',
+            '禁用模型自动调用',
+            '启用后，Skill 只能通过 /command 手动触发',
+            _disableModelInvocation,
+            (v) => setState(() => _disableModelInvocation = v),
+          ),
+          const SizedBox(height: 12),
+          _buildSwitchTile(
+            'allow-multiple-turns',
+            '允许多轮对话',
+            '启用后，Skill 可以在子代理中进行多轮对话',
+            _allowMultipleTurns ?? false,
+            (v) => setState(() => _allowMultipleTurns = v),
+            triState: true,
+            currentValue: _allowMultipleTurns,
+          ),
+          const SizedBox(height: 32),
+
+          // Agent 设置
+          _buildField(
+            'Agent (代理类型)',
+            _agentCtrl,
+            hintText: '可选，如 explore、code 等',
+            helperText: '用于 fork 上下文时指定代理类型',
+          ),
+          const SizedBox(height: 32),
+
+          // 工具控制
+          _buildSectionHeader(
+            '工具访问控制',
+            subtitle: '限制 Skill 可以使用的工具',
+          ),
+          const SizedBox(height: 12),
+          _buildField(
+            'allowed-tools (允许的工具)',
+            _allowedToolsCtrl,
+            hintText: '逗号分隔，如: read, write, execute',
+            helperText: '留空表示允许所有工具',
+          ),
+          const SizedBox(height: 16),
+          _buildField(
+            'disallowed-tools (禁止的工具)',
+            _disallowedToolsCtrl,
+            hintText: '逗号分隔，如: delete, network',
+            helperText: '列出禁止使用的工具',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContextOption(
+    String value,
+    String title,
+    String description,
+    IconData icon,
+  ) {
+    final isSelected = _context == value;
+    return InkWell(
+      onTap: () => setState(() => _context = value),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 200,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Colors.orange.withOpacity(0.1)
+              : const Color(0xFF252525),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? Colors.orange : const Color(0xFF333333),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  icon,
+                  color: isSelected ? Colors.orange : Colors.grey,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: isSelected ? Colors.orange : Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              description,
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSwitchTile(
+    String key,
+    String title,
+    String description,
+    bool value,
+    ValueChanged<bool> onChanged, {
+    bool triState = false,
+    bool? currentValue,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF252525),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF333333)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          if (triState)
+            Row(
+              children: [
+                TextButton(
+                  onPressed: () => setState(() => _allowMultipleTurns = null),
+                  child: Text(
+                    '未设置',
+                    style: TextStyle(
+                      color: currentValue == null ? Colors.orange : Colors.grey,
+                    ),
+                  ),
+                ),
+                Switch(
+                  value: value,
+                  onChanged: onChanged,
+                  activeColor: Colors.orange,
+                ),
+              ],
+            )
+          else
+            Switch(
+              value: value,
+              onChanged: onChanged,
+              activeColor: Colors.orange,
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 支持文件标签页
+  Widget _buildFilesTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 说明
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '支持文件说明',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '支持文件是 Skill 目录中除 SKILL.md 外的其他文件：\n'
+                        '• scripts/ - Claude 可执行的脚本\n'
+                        '• examples/ - 示例输出文件\n'
+                        '• template.md - 模板文件\n\n'
+                        '在 SKILL.md 中引用这些文件以告诉 Claude 如何使用它们。',
+                        style: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 12,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // 添加文件按钮
+          Row(
+            children: [
+              _buildAddFileButton(
+                '添加脚本',
+                Icons.terminal,
+                Colors.green,
+                () => _showAddFileDialog(SkillFileType.script),
+              ),
+              const SizedBox(width: 12),
+              _buildAddFileButton(
+                '添加示例',
+                Icons.description,
+                Colors.blue,
+                () => _showAddFileDialog(SkillFileType.example),
+              ),
+              const SizedBox(width: 12),
+              _buildAddFileButton(
+                '添加模板',
+                Icons.insert_drive_file,
+                Colors.purple,
+                () => _showAddFileDialog(SkillFileType.template),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // 现有文件列表
+          if (_existingFiles.isNotEmpty) ...[
+            _buildSectionHeader('现有文件'),
+            const SizedBox(height: 12),
+            ..._existingFiles.map((file) => _buildExistingFileItem(file)),
+            const SizedBox(height: 24),
+          ],
+
+          // 新文件列表
+          if (_newFiles.isNotEmpty) ...[
+            _buildSectionHeader('待添加文件'),
+            const SizedBox(height: 12),
+            ..._newFiles.asMap().entries.map(
+                  (entry) => _buildNewFileItem(entry.key, entry.value),
+                ),
+          ],
+
+          // 待删除文件
+          if (_deleteFiles.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            _buildSectionHeader(
+              '待删除文件',
+              color: Colors.red,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _deleteFiles
+                  .map((path) => Chip(
+                        label: Text(
+                          path,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                        deleteIcon: const Icon(Icons.undo, size: 16),
+                        onDeleted: () {
+                          setState(() {
+                            _deleteFiles.remove(path);
+                            // 恢复到现有文件列表
+                            final existing = widget.skill?.supportingFiles
+                                .where((f) => f.relativePath == path)
+                                .firstOrNull;
+                            if (existing != null) {
+                              _existingFiles.add(existing);
+                            }
+                          });
+                        },
+                        backgroundColor: Colors.red.withOpacity(0.1),
+                        side: const BorderSide(color: Colors.red),
+                      ))
+                  .toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddFileButton(
+    String label,
+    IconData icon,
+    Color color,
+    VoidCallback onPressed,
+  ) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18, color: color),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: color,
+        side: BorderSide(color: color.withOpacity(0.5)),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    );
+  }
+
+  Widget _buildExistingFileItem(SkillFile file) {
+    final isDeleted = _deleteFiles.contains(file.relativePath);
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDeleted
+            ? Colors.red.withOpacity(0.1)
+            : const Color(0xFF252525),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isDeleted ? Colors.red : const Color(0xFF333333),
+        ),
+      ),
+      child: Row(
+        children: [
+          Text(file.icon, style: const TextStyle(fontSize: 18)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  file.relativePath,
+                  style: TextStyle(
+                    color: isDeleted ? Colors.red : Colors.white,
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                    decoration: isDeleted ? TextDecoration.lineThrough : null,
+                  ),
+                ),
+                Text(
+                  file.typeDescription,
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          if (!isDeleted) ...[
+            IconButton(
+              icon: const Icon(Icons.visibility, size: 18),
+              color: Colors.grey,
+              tooltip: '预览',
+              onPressed: () => _previewFile(file),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 18),
+              color: Colors.red,
+              tooltip: '删除',
+              onPressed: () {
+                setState(() {
+                  _deleteFiles.add(file.relativePath);
+                  _existingFiles.remove(file);
+                });
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNewFileItem(int index, NewSkillFile file) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.green.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.green.withOpacity(0.5)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Icon(Icons.add, size: 14, color: Colors.green),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  file.relativePath,
+                  style: const TextStyle(
+                    color: Colors.green,
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  '${file.content.length} 字符',
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit, size: 18),
+            color: Colors.blue,
+            tooltip: '编辑',
+            onPressed: () => _editNewFile(index),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, size: 18),
+            color: Colors.red,
+            tooltip: '移除',
+            onPressed: () {
+              setState(() => _newFiles.removeAt(index));
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildField(
+    String label,
+    TextEditingController controller, {
+    String? hintText,
+    String? helperText,
+    int maxLines = 1,
+    bool enabled = true,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        if (helperText != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            helperText,
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+          ),
+        ],
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          enabled: enabled,
+          maxLines: maxLines,
+          style: TextStyle(
+            color: enabled ? Colors.white : Colors.grey,
+            fontSize: 13,
+          ),
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: TextStyle(color: Colors.grey.shade600),
+            filled: true,
+            fillColor: const Color(0xFF252525),
+            contentPadding: const EdgeInsets.all(12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF333333)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF333333)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.orange),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF252525)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(String title, {String? subtitle, Color? color}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: color ?? Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ============ 文件操作 ============
+
+  Future<void> _showAddFileDialog(SkillFileType type) async {
+    final nameCtrl = TextEditingController();
+    final contentCtrl = TextEditingController();
+
+    String prefix = '';
+    String defaultExt = '.md';
+    String placeholder = '';
+
+    switch (type) {
+      case SkillFileType.script:
+        prefix = 'scripts/';
+        defaultExt = '.sh';
+        placeholder = 'validate.sh';
+        contentCtrl.text = ClaudeSkillService.getDefaultScriptTemplate('script.sh');
+        break;
+      case SkillFileType.example:
+        prefix = 'examples/';
+        placeholder = 'sample.md';
+        contentCtrl.text = ClaudeSkillService.getDefaultExampleTemplate('sample.md');
+        break;
+      case SkillFileType.template:
+        placeholder = 'template.md';
+        contentCtrl.text = ClaudeSkillService.getDefaultTemplateContent('template.md');
+        break;
+      case SkillFileType.other:
+        placeholder = 'file.txt';
+        break;
+    }
+
+    final result = await showDialog<NewSkillFile>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF252525),
+          title: Text(
+            '添加${type == SkillFileType.script ? '脚本' : type == SkillFileType.example ? '示例' : '模板'}文件',
+            style: const TextStyle(color: Colors.white),
+          ),
+          content: SizedBox(
+            width: 600,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 文件名
+                  Row(
+                    children: [
+                      if (prefix.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A1A1A),
+                            borderRadius: const BorderRadius.horizontal(
+                              left: Radius.circular(8),
+                            ),
+                            border: Border.all(color: const Color(0xFF333333)),
+                          ),
+                          child: Text(
+                            prefix,
+                            style: TextStyle(
+                              color: Colors.grey.shade400,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                      Expanded(
+                        child: TextField(
+                          controller: nameCtrl,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'monospace',
+                          ),
+                          decoration: InputDecoration(
+                            hintText: placeholder,
+                            hintStyle: TextStyle(color: Colors.grey.shade600),
+                            filled: true,
+                            fillColor: const Color(0xFF1A1A1A),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.horizontal(
+                                left: prefix.isEmpty
+                                    ? const Radius.circular(8)
+                                    : Radius.zero,
+                                right: const Radius.circular(8),
+                              ),
+                              borderSide: const BorderSide(
+                                color: Color(0xFF333333),
+                              ),
+                            ),
+                          ),
+                          onChanged: (value) {
+                            // 更新模板内容中的文件名
+                            if (type == SkillFileType.script) {
+                              setDialogState(() {
+                                contentCtrl.text =
+                                    ClaudeSkillService.getDefaultScriptTemplate(
+                                        value.isEmpty ? 'script$defaultExt' : value);
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 脚本类型选择（仅脚本）
+                  if (type == SkillFileType.script) ...[
+                    Text(
+                      '脚本类型',
+                      style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        _buildScriptTypeChip('.sh', 'Bash', nameCtrl, contentCtrl, setDialogState),
+                        _buildScriptTypeChip('.py', 'Python', nameCtrl, contentCtrl, setDialogState),
+                        _buildScriptTypeChip('.js', 'JavaScript', nameCtrl, contentCtrl, setDialogState),
+                        _buildScriptTypeChip('.ps1', 'PowerShell', nameCtrl, contentCtrl, setDialogState),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // 内容
+                  Text(
+                    '文件内容',
+                    style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 300,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D1117),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF30363D)),
+                    ),
+                    child: TextField(
+                      controller: contentCtrl,
+                      maxLines: null,
+                      expands: true,
+                      style: const TextStyle(
+                        color: Color(0xFFE6EDF3),
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                        height: 1.5,
+                      ),
+                      decoration: const InputDecoration(
+                        contentPadding: EdgeInsets.all(12),
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('请输入文件名')),
+                  );
+                  return;
+                }
+
+                Navigator.pop(
+                  ctx,
+                  NewSkillFile(
+                    relativePath: '$prefix$name',
+                    content: contentCtrl.text,
+                    type: type,
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              child: const Text('添加'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != null) {
+      setState(() => _newFiles.add(result));
+    }
+
+    nameCtrl.dispose();
+    contentCtrl.dispose();
+  }
+
+  Widget _buildScriptTypeChip(
+    String ext,
+    String label,
+    TextEditingController nameCtrl,
+    TextEditingController contentCtrl,
+    StateSetter setDialogState,
+  ) {
+    return ActionChip(
+      label: Text(label),
+      onPressed: () {
+        final baseName = nameCtrl.text.split('.').first;
+        final newName = baseName.isEmpty ? 'script$ext' : '$baseName$ext';
+        setDialogState(() {
+          nameCtrl.text = newName;
+          contentCtrl.text = ClaudeSkillService.getDefaultScriptTemplate(newName);
+        });
+      },
+    );
+  }
+
+  Future<void> _editNewFile(int index) async {
+    final file = _newFiles[index];
+    final contentCtrl = TextEditingController(text: file.content);
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF252525),
+        title: Text(
+          '编辑 ${file.relativePath}',
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: SizedBox(
+          width: 600,
+          height: 400,
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D1117),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF30363D)),
+            ),
+            child: TextField(
+              controller: contentCtrl,
+              maxLines: null,
+              expands: true,
+              style: const TextStyle(
+                color: Color(0xFFE6EDF3),
+                fontSize: 12,
+                fontFamily: 'monospace',
+                height: 1.5,
+              ),
+              decoration: const InputDecoration(
+                contentPadding: EdgeInsets.all(12),
+                border: InputBorder.none,
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, contentCtrl.text),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _newFiles[index] = NewSkillFile(
+          relativePath: file.relativePath,
+          content: result,
+          type: file.type,
+        );
+      });
+    }
+
+    contentCtrl.dispose();
+  }
+
+  Future<void> _previewFile(SkillFile file) async {
+    try {
+      final content = await file.readContent();
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF252525),
+            title: Row(
+              children: [
+                Text(file.icon, style: const TextStyle(fontSize: 18)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    file.relativePath,
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 600,
+              height: 400,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D1117),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(12),
+                  child: SelectableText(
+                    content,
+                    style: const TextStyle(
+                      color: Color(0xFFE6EDF3),
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('关闭'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('读取文件失败: $e')),
+        );
+      }
+    }
+  }
+
+  // ============ 保存 ============
+
+  Future<void> _save() async {
+    final name = _nameCtrl.text.trim();
+    final content = _contentCtrl.text.trim();
+
+    // 验证
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请输入 Skill 名称')),
+      );
+      _tabCtrl.animateTo(0);
+      return;
+    }
+
+    if (!ClaudeSkillService.isValidSkillName(name)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('名称只能包含字母、数字、连字符和下划线，且以字母开头')),
+      );
+      _tabCtrl.animateTo(0);
+      return;
+    }
+
+    if (content.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请输入 Skill 内容')),
+      );
+      _tabCtrl.animateTo(0);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      ClaudeSkill result;
+
+      // 解析工具列表
+      List<String>? allowedTools;
+      List<String>? disallowedTools;
+
+      final allowedText = _allowedToolsCtrl.text.trim();
+      if (allowedText.isNotEmpty) {
+        allowedTools = allowedText
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
+
+      final disallowedText = _disallowedToolsCtrl.text.trim();
+      if (disallowedText.isNotEmpty) {
+        disallowedTools = disallowedText
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
+
+      if (isEditing) {
+        // 更新现有 skill
+        final updatedSkill = widget.skill!.copyWith(
+          description: _descCtrl.text.trim(),
+          content: content,
+          context: _context,
+          disableModelInvocation: _disableModelInvocation,
+          allowedTools: allowedTools,
+          disallowedTools: disallowedTools,
+          agent: _agentCtrl.text.trim().isEmpty ? null : _agentCtrl.text.trim(),
+          allowMultipleTurns: _allowMultipleTurns,
+        );
+
+        result = await ClaudeSkillService.updateSkill(
+          updatedSkill,
+          newFiles: _newFiles.isEmpty ? null : _newFiles,
+          deleteFiles: _deleteFiles.isEmpty ? null : _deleteFiles,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Skill 已更新')),
+          );
+        }
+      } else {
+        // 创建新 skill
+        result = await ClaudeSkillService.createSkill(
+          name: name,
+          description: _descCtrl.text.trim(),
+          content: content,
+          context: _context,
+          disableModelInvocation: _disableModelInvocation,
+          allowedTools: allowedTools,
+          disallowedTools: disallowedTools,
+          agent: _agentCtrl.text.trim().isEmpty ? null : _agentCtrl.text.trim(),
+          allowMultipleTurns: _allowMultipleTurns,
+          supportingFiles: _newFiles.isEmpty ? null : _newFiles,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('已创建 Skill: /$name')),
+          );
+        }
+      }
+
+      if (mounted) {
+        Navigator.of(context).pop(result);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存失败: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }

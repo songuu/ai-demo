@@ -3,13 +3,13 @@ import 'dart:io';
 /// Claude Code Skill 数据模型
 /// 参考: https://code.claude.com/docs/en/skills
 class ClaudeSkill {
-  /// Skill 名称（目录名）
+  /// Skill 名称（目录名，也是 slash command 名称）
   final String name;
   
-  /// Skill 描述（从 frontmatter 或内容提取）
+  /// Skill 描述（从 frontmatter 提取）
   final String description;
   
-  /// Skill 内容（SKILL.md 的主体部分）
+  /// Skill 内容（SKILL.md 的主体部分，不含 frontmatter）
   final String content;
   
   /// SKILL.md 的原始完整内容
@@ -21,8 +21,8 @@ class ClaudeSkill {
   /// 是否为系统 Skill（只读）
   final bool isSystem;
   
-  /// 支持文件列表（目录中除 SKILL.md 外的其他文件）
-  final List<String> supportingFiles;
+  /// 支持文件列表（包括子目录）
+  final List<SkillFile> supportingFiles;
   
   /// 文件修改时间
   final DateTime? modifiedAt;
@@ -30,9 +30,14 @@ class ClaudeSkill {
   // ============ Frontmatter 配置 ============
   
   /// 上下文设置: inline(默认), fork, none
+  /// - inline: Skill 内容直接添加到当前会话上下文
+  /// - fork: 在子代理中运行
+  /// - none: 不添加上下文
   final String? context;
   
   /// 是否禁用模型自动调用
+  /// true: 仅通过 /command 手动触发
+  /// false: Claude 可根据描述自动调用
   final bool disableModelInvocation;
   
   /// 允许的工具列表
@@ -40,6 +45,12 @@ class ClaudeSkill {
   
   /// 禁止的工具列表
   final List<String>? disallowedTools;
+  
+  /// 代理类型（用于 fork 上下文）
+  final String? agent;
+  
+  /// 是否允许多轮对话
+  final bool? allowMultipleTurns;
 
   ClaudeSkill({
     required this.name,
@@ -54,6 +65,8 @@ class ClaudeSkill {
     this.disableModelInvocation = false,
     this.allowedTools,
     this.disallowedTools,
+    this.agent,
+    this.allowMultipleTurns,
   });
 
   /// 从文件系统读取 Skill
@@ -65,19 +78,8 @@ class ClaudeSkill {
     // 解析 frontmatter 和内容
     final parsed = _parseFrontmatter(content);
     
-    // 获取支持文件
-    final supportingFiles = <String>[];
-    try {
-      final dir = skillFile.parent;
-      for (final entity in dir.listSync()) {
-        if (entity is File) {
-          final fileName = entity.path.split(Platform.pathSeparator).last;
-          if (fileName != 'SKILL.md') {
-            supportingFiles.add(fileName);
-          }
-        }
-      }
-    } catch (_) {}
+    // 获取支持文件（包括子目录）
+    final supportingFiles = _scanSupportingFiles(skillFile.parent);
     
     // 获取文件修改时间
     DateTime? modifiedAt;
@@ -86,7 +88,7 @@ class ClaudeSkill {
     } catch (_) {}
     
     return ClaudeSkill(
-      name: dirName,
+      name: parsed['name'] ?? dirName,
       description: parsed['description'] ?? '',
       content: parsed['content'] ?? '',
       rawContent: content,
@@ -98,7 +100,56 @@ class ClaudeSkill {
       disableModelInvocation: parsed['disableModelInvocation'] == 'true',
       allowedTools: parsed['allowedTools'],
       disallowedTools: parsed['disallowedTools'],
+      agent: parsed['agent'],
+      allowMultipleTurns: parsed['allowMultipleTurns'] == 'true' ? true : 
+                         parsed['allowMultipleTurns'] == 'false' ? false : null,
     );
+  }
+
+  /// 扫描支持文件（包括子目录）
+  static List<SkillFile> _scanSupportingFiles(Directory dir) {
+    final files = <SkillFile>[];
+    
+    try {
+      for (final entity in dir.listSync(recursive: true)) {
+        if (entity is File) {
+          final relativePath = entity.path.substring(dir.path.length + 1)
+              .replaceAll(Platform.pathSeparator, '/');
+          
+          // 跳过 SKILL.md
+          if (relativePath == 'SKILL.md') continue;
+          
+          // 确定文件类型
+          SkillFileType fileType;
+          if (relativePath.startsWith('scripts/')) {
+            fileType = SkillFileType.script;
+          } else if (relativePath.startsWith('examples/')) {
+            fileType = SkillFileType.example;
+          } else if (relativePath.endsWith('.md')) {
+            fileType = SkillFileType.template;
+          } else {
+            fileType = SkillFileType.other;
+          }
+          
+          files.add(SkillFile(
+            name: relativePath.split('/').last,
+            relativePath: relativePath,
+            absolutePath: entity.path,
+            type: fileType,
+          ));
+        }
+      }
+    } catch (_) {}
+    
+    // 按类型和名称排序
+    files.sort((a, b) {
+      if (a.type != b.type) {
+        return a.type.index.compareTo(b.type.index);
+      }
+      return a.relativePath.compareTo(b.relativePath);
+    });
+    
+    return files;
   }
 
   /// 解析 SKILL.md 的 frontmatter
@@ -121,6 +172,9 @@ class ClaudeSkill {
             var value = line.substring(colonIndex + 1).trim();
             
             switch (key) {
+              case 'name':
+                result['name'] = value;
+                break;
               case 'description':
                 result['description'] = value;
                 break;
@@ -135,6 +189,12 @@ class ClaudeSkill {
                 break;
               case 'disallowed-tools':
                 result['disallowedTools'] = _parseArrayValue(value);
+                break;
+              case 'agent':
+                result['agent'] = value;
+                break;
+              case 'allow-multiple-turns':
+                result['allowMultipleTurns'] = value;
                 break;
             }
           }
@@ -184,10 +244,13 @@ class ClaudeSkill {
         context != null ||
         disableModelInvocation ||
         (allowedTools != null && allowedTools!.isNotEmpty) ||
-        (disallowedTools != null && disallowedTools!.isNotEmpty);
+        (disallowedTools != null && disallowedTools!.isNotEmpty) ||
+        agent != null ||
+        allowMultipleTurns != null;
     
     if (hasFrontmatter) {
       buffer.writeln('---');
+      buffer.writeln('name: $name');
       if (description.isNotEmpty) {
         buffer.writeln('description: $description');
       }
@@ -203,6 +266,12 @@ class ClaudeSkill {
       if (disallowedTools != null && disallowedTools!.isNotEmpty) {
         buffer.writeln('disallowed-tools: [${disallowedTools!.join(', ')}]');
       }
+      if (agent != null && agent!.isNotEmpty) {
+        buffer.writeln('agent: $agent');
+      }
+      if (allowMultipleTurns != null) {
+        buffer.writeln('allow-multiple-turns: $allowMultipleTurns');
+      }
       buffer.writeln('---');
       buffer.writeln();
     }
@@ -215,6 +284,18 @@ class ClaudeSkill {
 
   /// 获取 slash 命令名称
   String get slashCommand => '/$name';
+  
+  /// 获取 scripts 文件列表
+  List<SkillFile> get scripts => 
+      supportingFiles.where((f) => f.type == SkillFileType.script).toList();
+  
+  /// 获取 examples 文件列表
+  List<SkillFile> get examples => 
+      supportingFiles.where((f) => f.type == SkillFileType.example).toList();
+  
+  /// 获取 template 文件列表
+  List<SkillFile> get templates => 
+      supportingFiles.where((f) => f.type == SkillFileType.template).toList();
 
   /// 复制并修改
   ClaudeSkill copyWith({
@@ -224,12 +305,14 @@ class ClaudeSkill {
     String? rawContent,
     String? path,
     bool? isSystem,
-    List<String>? supportingFiles,
+    List<SkillFile>? supportingFiles,
     DateTime? modifiedAt,
     String? context,
     bool? disableModelInvocation,
     List<String>? allowedTools,
     List<String>? disallowedTools,
+    String? agent,
+    bool? allowMultipleTurns,
   }) {
     return ClaudeSkill(
       name: name ?? this.name,
@@ -244,9 +327,97 @@ class ClaudeSkill {
       disableModelInvocation: disableModelInvocation ?? this.disableModelInvocation,
       allowedTools: allowedTools ?? this.allowedTools,
       disallowedTools: disallowedTools ?? this.disallowedTools,
+      agent: agent ?? this.agent,
+      allowMultipleTurns: allowMultipleTurns ?? this.allowMultipleTurns,
     );
   }
 
   @override
   String toString() => 'ClaudeSkill($name, isSystem: $isSystem)';
+}
+
+/// Skill 支持文件类型
+enum SkillFileType {
+  /// 脚本文件（scripts/ 目录）
+  script,
+  /// 示例文件（examples/ 目录）
+  example,
+  /// 模板文件（*.md，如 template.md）
+  template,
+  /// 其他文件
+  other,
+}
+
+/// Skill 支持文件
+class SkillFile {
+  /// 文件名
+  final String name;
+  
+  /// 相对于 skill 目录的路径
+  final String relativePath;
+  
+  /// 绝对路径
+  final String absolutePath;
+  
+  /// 文件类型
+  final SkillFileType type;
+
+  SkillFile({
+    required this.name,
+    required this.relativePath,
+    required this.absolutePath,
+    required this.type,
+  });
+  
+  /// 获取文件内容
+  Future<String> readContent() async {
+    final file = File(absolutePath);
+    if (await file.exists()) {
+      return await file.readAsString();
+    }
+    throw Exception('File not found: $absolutePath');
+  }
+  
+  /// 获取文件图标
+  String get icon {
+    switch (type) {
+      case SkillFileType.script:
+        return '📜';
+      case SkillFileType.example:
+        return '📝';
+      case SkillFileType.template:
+        return '📄';
+      case SkillFileType.other:
+        return '📎';
+    }
+  }
+  
+  /// 获取文件类型描述
+  String get typeDescription {
+    switch (type) {
+      case SkillFileType.script:
+        return '脚本';
+      case SkillFileType.example:
+        return '示例';
+      case SkillFileType.template:
+        return '模板';
+      case SkillFileType.other:
+        return '其他';
+    }
+  }
+}
+
+/// 新建 Skill 时的文件项
+class NewSkillFile {
+  String relativePath;
+  String content;
+  SkillFileType type;
+  
+  NewSkillFile({
+    required this.relativePath,
+    required this.content,
+    required this.type,
+  });
+  
+  String get name => relativePath.split('/').last;
 }

@@ -5,6 +5,7 @@ import 'package:server_box/codecore/model/claude_skill.dart';
 
 /// Claude Code Skill 本地文件服务
 /// 管理 ~/.claude/skills/ 目录下的 skills
+/// 参考: https://code.claude.com/docs/en/skills
 class ClaudeSkillService {
   ClaudeSkillService._();
 
@@ -111,6 +112,17 @@ class ClaudeSkillService {
   }
 
   /// 创建新的 skill
+  /// 
+  /// [name] skill 名称（也是目录名和 slash command）
+  /// [description] skill 描述
+  /// [content] SKILL.md 主体内容
+  /// [context] 上下文设置: inline, fork, none
+  /// [disableModelInvocation] 是否禁用模型自动调用
+  /// [allowedTools] 允许的工具列表
+  /// [disallowedTools] 禁止的工具列表
+  /// [agent] 代理类型
+  /// [allowMultipleTurns] 是否允许多轮对话
+  /// [supportingFiles] 支持文件列表
   static Future<ClaudeSkill> createSkill({
     required String name,
     required String description,
@@ -119,6 +131,9 @@ class ClaudeSkillService {
     bool disableModelInvocation = false,
     List<String>? allowedTools,
     List<String>? disallowedTools,
+    String? agent,
+    bool? allowMultipleTurns,
+    List<NewSkillFile>? supportingFiles,
   }) async {
     // 确保用户 skills 目录存在
     final userDir = Directory(userSkillsPath);
@@ -148,10 +163,23 @@ class ClaudeSkillService {
       disableModelInvocation: disableModelInvocation,
       allowedTools: allowedTools,
       disallowedTools: disallowedTools,
+      agent: agent,
+      allowMultipleTurns: allowMultipleTurns,
     );
     
     final skillFile = File('$skillDirPath${Platform.pathSeparator}SKILL.md');
     await skillFile.writeAsString(skill.toSkillMd());
+    
+    // 创建支持文件
+    if (supportingFiles != null && supportingFiles.isNotEmpty) {
+      for (final sf in supportingFiles) {
+        await addSupportingFile(
+          skillDirPath,
+          sf.relativePath,
+          sf.content,
+        );
+      }
+    }
     
     Loggers.app.info('Created skill: $name at $skillDirPath');
     
@@ -160,7 +188,11 @@ class ClaudeSkillService {
   }
 
   /// 更新 skill（仅支持用户自定义 skill）
-  static Future<ClaudeSkill> updateSkill(ClaudeSkill skill) async {
+  static Future<ClaudeSkill> updateSkill(
+    ClaudeSkill skill, {
+    List<NewSkillFile>? newFiles,
+    List<String>? deleteFiles,
+  }) async {
     if (skill.isSystem) {
       throw Exception('Cannot modify system skill');
     }
@@ -170,7 +202,22 @@ class ClaudeSkillService {
       throw Exception('Skill file not found');
     }
     
+    // 更新 SKILL.md
     await skillFile.writeAsString(skill.toSkillMd());
+    
+    // 删除指定的文件
+    if (deleteFiles != null && deleteFiles.isNotEmpty) {
+      for (final relativePath in deleteFiles) {
+        await deleteSupportingFile(skill.path, relativePath);
+      }
+    }
+    
+    // 添加/更新新文件
+    if (newFiles != null && newFiles.isNotEmpty) {
+      for (final sf in newFiles) {
+        await addSupportingFile(skill.path, sf.relativePath, sf.content);
+      }
+    }
     
     Loggers.app.info('Updated skill: ${skill.name}');
     
@@ -251,48 +298,73 @@ class ClaudeSkillService {
   }
 
   /// 读取支持文件内容
-  static Future<String> readSupportingFile(ClaudeSkill skill, String fileName) async {
-    final filePath = '${skill.path}${Platform.pathSeparator}$fileName';
+  static Future<String> readSupportingFile(String skillPath, String relativePath) async {
+    final normalizedPath = relativePath.replaceAll('/', Platform.pathSeparator);
+    final filePath = '$skillPath${Platform.pathSeparator}$normalizedPath';
     final file = File(filePath);
     
     if (!await file.exists()) {
-      throw Exception('File not found: $fileName');
+      throw Exception('File not found: $relativePath');
     }
     
     return await file.readAsString();
   }
 
-  /// 添加支持文件
+  /// 添加/更新支持文件
+  /// 
+  /// [skillPath] skill 目录路径
+  /// [relativePath] 相对路径，如 "scripts/validate.sh" 或 "template.md"
+  /// [content] 文件内容
   static Future<void> addSupportingFile(
-    ClaudeSkill skill,
-    String fileName,
+    String skillPath,
+    String relativePath,
     String content,
   ) async {
-    if (skill.isSystem) {
-      throw Exception('Cannot modify system skill');
-    }
-    
-    final filePath = '${skill.path}${Platform.pathSeparator}$fileName';
+    final normalizedPath = relativePath.replaceAll('/', Platform.pathSeparator);
+    final filePath = '$skillPath${Platform.pathSeparator}$normalizedPath';
     final file = File(filePath);
     
+    // 确保父目录存在
     await file.parent.create(recursive: true);
     await file.writeAsString(content);
     
-    Loggers.app.info('Added supporting file: $fileName to ${skill.name}');
+    Loggers.app.info('Added supporting file: $relativePath');
   }
 
   /// 删除支持文件
-  static Future<void> deleteSupportingFile(ClaudeSkill skill, String fileName) async {
-    if (skill.isSystem) {
-      throw Exception('Cannot modify system skill');
-    }
-    
-    final filePath = '${skill.path}${Platform.pathSeparator}$fileName';
+  static Future<void> deleteSupportingFile(String skillPath, String relativePath) async {
+    final normalizedPath = relativePath.replaceAll('/', Platform.pathSeparator);
+    final filePath = '$skillPath${Platform.pathSeparator}$normalizedPath';
     final file = File(filePath);
     
     if (await file.exists()) {
       await file.delete();
-      Loggers.app.info('Deleted supporting file: $fileName from ${skill.name}');
+      Loggers.app.info('Deleted supporting file: $relativePath');
+      
+      // 如果目录为空，删除目录
+      final parent = file.parent;
+      if (await parent.exists() && parent.path != skillPath) {
+        final children = await parent.list().toList();
+        if (children.isEmpty) {
+          await parent.delete();
+        }
+      }
+    }
+  }
+
+  /// 创建 scripts 子目录
+  static Future<void> ensureScriptsDir(String skillPath) async {
+    final dir = Directory('$skillPath${Platform.pathSeparator}scripts');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+  }
+
+  /// 创建 examples 子目录
+  static Future<void> ensureExamplesDir(String skillPath) async {
+    final dir = Directory('$skillPath${Platform.pathSeparator}examples');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
     }
   }
 
@@ -329,8 +401,8 @@ class ClaudeSkillService {
   }
 
   /// 检查 skill 名称是否有效
+  /// 只允许字母、数字、连字符和下划线，且以字母开头
   static bool isValidSkillName(String name) {
-    // 只允许字母、数字、连字符和下划线
     final regex = RegExp(r'^[a-zA-Z][a-zA-Z0-9_-]*$');
     return regex.hasMatch(name) && name.length <= 50;
   }
@@ -339,5 +411,114 @@ class ClaudeSkillService {
   static Future<bool> skillExists(String name) async {
     final skillDir = Directory('$userSkillsPath${Platform.pathSeparator}$name');
     return await skillDir.exists();
+  }
+  
+  /// 获取默认的脚本模板
+  static String getDefaultScriptTemplate(String scriptName) {
+    final ext = scriptName.split('.').last.toLowerCase();
+    
+    switch (ext) {
+      case 'sh':
+      case 'bash':
+        return '''#!/bin/bash
+# $scriptName
+# 这个脚本由 Claude 执行
+
+set -e
+
+# 在这里添加你的脚本逻辑
+echo "Running $scriptName..."
+
+# 示例：接收参数
+if [ \$# -gt 0 ]; then
+    echo "Arguments: \$@"
+fi
+''';
+      case 'py':
+        return '''#!/usr/bin/env python3
+"""
+$scriptName
+这个脚本由 Claude 执行
+"""
+
+import sys
+
+def main():
+    print(f"Running $scriptName...")
+    
+    # 在这里添加你的脚本逻辑
+    if len(sys.argv) > 1:
+        print(f"Arguments: {sys.argv[1:]}")
+
+if __name__ == "__main__":
+    main()
+''';
+      case 'js':
+        return '''#!/usr/bin/env node
+/**
+ * $scriptName
+ * 这个脚本由 Claude 执行
+ */
+
+console.log("Running $scriptName...");
+
+// 在这里添加你的脚本逻辑
+if (process.argv.length > 2) {
+    console.log("Arguments:", process.argv.slice(2));
+}
+''';
+      case 'ps1':
+        return '''# $scriptName
+# 这个脚本由 Claude 执行 (PowerShell)
+
+Write-Host "Running $scriptName..."
+
+# 在这里添加你的脚本逻辑
+if (\$args.Count -gt 0) {
+    Write-Host "Arguments: \$args"
+}
+''';
+      default:
+        return '# $scriptName\n# 在这里添加你的脚本内容\n';
+    }
+  }
+  
+  /// 获取默认的示例文件模板
+  static String getDefaultExampleTemplate(String fileName) {
+    return '''# Example: $fileName
+
+这是一个示例文件，展示了预期的输出格式。
+
+## 使用说明
+
+在 SKILL.md 中引用此示例：
+\`\`\`
+参考 examples/$fileName 查看预期输出格式。
+\`\`\`
+
+## 示例内容
+
+在这里添加示例内容...
+''';
+  }
+  
+  /// 获取默认的模板文件
+  static String getDefaultTemplateContent(String fileName) {
+    return '''# Template: $fileName
+
+这是一个模板文件，Claude 会根据需要填充此模板。
+
+## 模板变量
+
+使用 \${{variable_name}} 语法定义变量：
+
+- \${{title}} - 标题
+- \${{description}} - 描述
+- \${{content}} - 主要内容
+
+## 模板内容
+
+\${{content}}
+''';
   }
 }
