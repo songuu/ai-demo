@@ -46,6 +46,11 @@ class CodSettingsStore {
   static Future<void> setGeminiCli(String value) async =>
       _box?.put('geminiCli', value);
 
+  static String get skillsMpApiKey =>
+      _box?.get('skillsMpApiKey', defaultValue: '') ?? '';
+  static Future<void> setSkillsMpApiKey(String value) async =>
+      _box?.put('skillsMpApiKey', value.trim());
+
   static String resolveCli(String provider) {
     switch (provider) {
       case 'codex':

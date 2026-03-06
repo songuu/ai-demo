@@ -39,6 +39,8 @@ foreach ($path in $possiblePaths) {
 
 if (-not $foundATL) {
     Write-Host "❌ ATL headers not found. Please install Visual Studio with C++ ATL components." -ForegroundColor Red
+    Write-Host "   解决步骤: 打开 Visual Studio Installer -> 修改 -> 单个组件 -> 搜索 ATL -> 勾选 C++ ATL" -ForegroundColor Yellow
+    Write-Host "   详细说明: 参见 docs/WINDOWS_BUILD_FIX.md" -ForegroundColor Yellow
 }
 
 Write-Host "`nSetup check completed!" -ForegroundColor Green

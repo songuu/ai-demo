@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:server_box/codecore/model/claude_skill.dart';
 import 'package:server_box/codecore/service/claude_skill_service.dart';
+import 'package:server_box/view/page/codecore/widgets/remote_market_dialog.dart';
 
 /// Claude Code Skills 管理页面
 /// 管理本地 ~/.claude/skills/ 目录下的 skills
@@ -138,7 +139,8 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
               ),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+            child:
+                const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
           Column(
@@ -168,10 +170,12 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
               decoration: InputDecoration(
                 hintText: '搜索 Skills...',
                 hintStyle: TextStyle(color: Colors.grey.shade600),
-                prefixIcon: Icon(Icons.search, color: Colors.grey.shade600, size: 18),
+                prefixIcon:
+                    Icon(Icons.search, color: Colors.grey.shade600, size: 18),
                 filled: true,
                 fillColor: const Color(0xFF1A1A1A),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide(color: Colors.grey.shade700),
@@ -197,9 +201,21 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
           ),
           // 打开目录按钮
           IconButton(
-            icon: Icon(Icons.folder_open, color: Colors.grey.shade400, size: 20),
+            icon:
+                Icon(Icons.folder_open, color: Colors.grey.shade400, size: 20),
             tooltip: '打开 Skills 目录',
             onPressed: () => ClaudeSkillService.openUserSkillsDirectory(),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: _openRemoteMarketplace,
+            icon: const Icon(Icons.cloud_download_outlined, size: 16),
+            label: const Text('远端市场'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.orange,
+              side: const BorderSide(color: Colors.orange),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            ),
           ),
           const SizedBox(width: 8),
           // 新建按钮
@@ -254,7 +270,8 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.orange.withOpacity(0.2) : Colors.transparent,
+          color:
+              isSelected ? Colors.orange.withOpacity(0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? Colors.orange : Colors.grey.shade700,
@@ -335,7 +352,8 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.auto_awesome_outlined, color: Colors.grey.shade600, size: 48),
+            Icon(Icons.auto_awesome_outlined,
+                color: Colors.grey.shade600, size: 48),
             const SizedBox(height: 16),
             Text(
               '没有找到 Skills',
@@ -364,8 +382,8 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
   }
 
   Widget _buildSkillItem(ClaudeSkill skill) {
-    final isSelected = _selectedSkill?.name == skill.name && 
-                       _selectedSkill?.path == skill.path;
+    final isSelected = _selectedSkill?.name == skill.name &&
+        _selectedSkill?.path == skill.path;
 
     return InkWell(
       onTap: () => setState(() => _selectedSkill = skill),
@@ -374,7 +392,9 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
         margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.orange.withOpacity(0.15) : const Color(0xFF252525),
+          color: isSelected
+              ? Colors.orange.withOpacity(0.15)
+              : const Color(0xFF252525),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isSelected ? Colors.orange : const Color(0xFF333333),
@@ -422,7 +442,8 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
                       if (skill.isSystem) ...[
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: Colors.blue.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(4),
@@ -435,10 +456,12 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
                       ],
                       if (skill.supportingFiles.isNotEmpty) ...[
                         const SizedBox(width: 6),
-                        Icon(Icons.attach_file, size: 12, color: Colors.grey.shade500),
+                        Icon(Icons.attach_file,
+                            size: 12, color: Colors.grey.shade500),
                         Text(
                           '${skill.supportingFiles.length}',
-                          style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
+                          style: TextStyle(
+                              color: Colors.grey.shade500, fontSize: 10),
                         ),
                       ],
                     ],
@@ -447,7 +470,8 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
                     const SizedBox(height: 4),
                     Text(
                       skill.description,
-                      style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                      style:
+                          TextStyle(color: Colors.grey.shade500, fontSize: 11),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -632,7 +656,8 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
                 skill.allowedTools!.join(', '),
                 Colors.blue,
               ),
-            if (skill.disallowedTools != null && skill.disallowedTools!.isNotEmpty)
+            if (skill.disallowedTools != null &&
+                skill.disallowedTools!.isNotEmpty)
               _buildConfigChip(
                 'disallowed-tools',
                 skill.disallowedTools!.join(', '),
@@ -701,25 +726,25 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
       children: [
         _buildSectionTitle('支持文件 (${skill.supportingFiles.length})'),
         const SizedBox(height: 12),
-        
+
         // Scripts
         if (scripts.isNotEmpty) ...[
           _buildFileCategory('📜 脚本 (scripts/)', scripts, skill),
           const SizedBox(height: 12),
         ],
-        
+
         // Examples
         if (examples.isNotEmpty) ...[
           _buildFileCategory('📝 示例 (examples/)', examples, skill),
           const SizedBox(height: 12),
         ],
-        
+
         // Templates
         if (templates.isNotEmpty) ...[
           _buildFileCategory('📄 模板', templates, skill),
           const SizedBox(height: 12),
         ],
-        
+
         // Others
         if (others.isNotEmpty) ...[
           _buildFileCategory('📎 其他文件', others, skill),
@@ -728,7 +753,8 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
     );
   }
 
-  Widget _buildFileCategory(String title, List<SkillFile> files, ClaudeSkill skill) {
+  Widget _buildFileCategory(
+      String title, List<SkillFile> files, ClaudeSkill skill) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -749,7 +775,8 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
               onTap: () => _showFileContent(skill, file),
               borderRadius: BorderRadius.circular(6),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: const Color(0xFF252525),
                   borderRadius: BorderRadius.circular(6),
@@ -847,7 +874,8 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
           Flexible(
             child: Text(
               value,
-              style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                  color: color, fontSize: 11, fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -1066,6 +1094,35 @@ class _ClaudeSkillPageState extends State<ClaudeSkillPage> {
         );
       }
     }
+  }
+
+  Future<void> _openRemoteMarketplace() async {
+    final installedNames = _skills
+        .where((skill) => !skill.isSystem)
+        .map((skill) => skill.name)
+        .toSet();
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => RemoteMarketDialog(
+        installedSkillNames: installedNames,
+        onSkillInstalled: (skillName) async {
+          await _loadSkills();
+          if (!mounted) return;
+          ClaudeSkill? installed;
+          for (final skill in _skills) {
+            if (!skill.isSystem && skill.name == skillName) {
+              installed = skill;
+              break;
+            }
+          }
+          if (installed != null) {
+            setState(() => _selectedSkill = installed);
+          }
+        },
+      ),
+    );
   }
 }
 
@@ -1659,14 +1716,13 @@ class _SkillEditorPageState extends State<_SkillEditorPage>
 
   Widget _buildExistingFileItem(SkillFile file) {
     final isDeleted = _deleteFiles.contains(file.relativePath);
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDeleted
-            ? Colors.red.withOpacity(0.1)
-            : const Color(0xFF252525),
+        color:
+            isDeleted ? Colors.red.withOpacity(0.1) : const Color(0xFF252525),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isDeleted ? Colors.red : const Color(0xFF333333),
@@ -1879,16 +1935,19 @@ class _SkillEditorPageState extends State<_SkillEditorPage>
         prefix = 'scripts/';
         defaultExt = '.sh';
         placeholder = 'validate.sh';
-        contentCtrl.text = ClaudeSkillService.getDefaultScriptTemplate('script.sh');
+        contentCtrl.text =
+            ClaudeSkillService.getDefaultScriptTemplate('script.sh');
         break;
       case SkillFileType.example:
         prefix = 'examples/';
         placeholder = 'sample.md';
-        contentCtrl.text = ClaudeSkillService.getDefaultExampleTemplate('sample.md');
+        contentCtrl.text =
+            ClaudeSkillService.getDefaultExampleTemplate('sample.md');
         break;
       case SkillFileType.template:
         placeholder = 'template.md';
-        contentCtrl.text = ClaudeSkillService.getDefaultTemplateContent('template.md');
+        contentCtrl.text =
+            ClaudeSkillService.getDefaultTemplateContent('template.md');
         break;
       case SkillFileType.other:
         placeholder = 'file.txt';
@@ -1965,7 +2024,9 @@ class _SkillEditorPageState extends State<_SkillEditorPage>
                               setDialogState(() {
                                 contentCtrl.text =
                                     ClaudeSkillService.getDefaultScriptTemplate(
-                                        value.isEmpty ? 'script$defaultExt' : value);
+                                        value.isEmpty
+                                            ? 'script$defaultExt'
+                                            : value);
                               });
                             }
                           },
@@ -1979,16 +2040,21 @@ class _SkillEditorPageState extends State<_SkillEditorPage>
                   if (type == SkillFileType.script) ...[
                     Text(
                       '脚本类型',
-                      style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                      style:
+                          TextStyle(color: Colors.grey.shade400, fontSize: 12),
                     ),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
                       children: [
-                        _buildScriptTypeChip('.sh', 'Bash', nameCtrl, contentCtrl, setDialogState),
-                        _buildScriptTypeChip('.py', 'Python', nameCtrl, contentCtrl, setDialogState),
-                        _buildScriptTypeChip('.js', 'JavaScript', nameCtrl, contentCtrl, setDialogState),
-                        _buildScriptTypeChip('.ps1', 'PowerShell', nameCtrl, contentCtrl, setDialogState),
+                        _buildScriptTypeChip('.sh', 'Bash', nameCtrl,
+                            contentCtrl, setDialogState),
+                        _buildScriptTypeChip('.py', 'Python', nameCtrl,
+                            contentCtrl, setDialogState),
+                        _buildScriptTypeChip('.js', 'JavaScript', nameCtrl,
+                            contentCtrl, setDialogState),
+                        _buildScriptTypeChip('.ps1', 'PowerShell', nameCtrl,
+                            contentCtrl, setDialogState),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -2081,7 +2147,8 @@ class _SkillEditorPageState extends State<_SkillEditorPage>
         final newName = baseName.isEmpty ? 'script$ext' : '$baseName$ext';
         setDialogState(() {
           nameCtrl.text = newName;
-          contentCtrl.text = ClaudeSkillService.getDefaultScriptTemplate(newName);
+          contentCtrl.text =
+              ClaudeSkillService.getDefaultScriptTemplate(newName);
         });
       },
     );

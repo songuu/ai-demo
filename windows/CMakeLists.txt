@@ -40,6 +40,22 @@ endfunction()
 
 set(FLUTTER_MANAGED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/flutter")
 
+# ATL include and lib path for plugins (e.g. flutter_secure_storage_windows)
+# Required when building with Visual Studio Build Tools
+file(GLOB VC_ATL_INCLUDE_PATHS
+  "C:/Program Files (x86)/Microsoft Visual Studio/2022/*/VC/Tools/MSVC/*/atlmfc/include"
+  "C:/Program Files/Microsoft Visual Studio/2022/*/VC/Tools/MSVC/*/atlmfc/include"
+)
+if(VC_ATL_INCLUDE_PATHS)
+  list(GET VC_ATL_INCLUDE_PATHS 0 VC_ATL_INCLUDE)
+  include_directories(${VC_ATL_INCLUDE})
+  # atlmfc/lib/x64 contains atls.lib for x64 builds
+  get_filename_component(VC_ATL_LIB_DIR "${VC_ATL_INCLUDE}/../lib/x64" ABSOLUTE)
+  if(EXISTS "${VC_ATL_LIB_DIR}")
+    link_directories(${VC_ATL_LIB_DIR})
+  endif()
+endif()
+
 # Flutter library and tool build rules.
 add_subdirectory(${FLUTTER_MANAGED_DIR})
 
