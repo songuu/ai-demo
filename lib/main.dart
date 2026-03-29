@@ -16,6 +16,17 @@ import 'package:server_box/codecore/store/cod_session_store.dart';
 import 'package:server_box/codecore/store/cod_settings_store.dart';
 import 'package:server_box/codecore/store/cod_config_store.dart';
 import 'package:server_box/codecore/store/cod_skill_store.dart';
+import 'package:server_box/chat/model/chat_provider.dart';
+import 'package:server_box/chat/model/chat_model.dart';
+import 'package:server_box/chat/model/chat_conversation.dart';
+import 'package:server_box/chat/model/chat_message.dart';
+import 'package:server_box/chat/model/mcp_server_config.dart';
+import 'package:server_box/chat/model/openclaw_config.dart';
+import 'package:server_box/chat/store/chat_provider_store.dart';
+import 'package:server_box/chat/store/chat_conversation_store.dart';
+import 'package:server_box/chat/store/chat_message_store.dart';
+import 'package:server_box/chat/store/mcp_server_store.dart';
+import 'package:server_box/chat/store/openclaw_store.dart';
 import 'package:server_box/core/sync.dart';
 import 'package:server_box/data/model/app/menu/server_func.dart';
 import 'package:server_box/data/model/app/net_view.dart';
@@ -84,6 +95,12 @@ Future<void> _initData() async {
   Hive.registerAdapter(CodSkillTypeAdapter()); // 12
   Hive.registerAdapter(CodSkillProviderAdapter()); // 13
   Hive.registerAdapter(CodSkillAdapter()); // 14
+  Hive.registerAdapter(ChatProviderAdapter()); // 15
+  Hive.registerAdapter(ChatModelAdapter()); // 16
+  Hive.registerAdapter(ChatConversationAdapter()); // 17
+  Hive.registerAdapter(ChatMessageAdapter()); // 18
+  Hive.registerAdapter(McpServerConfigAdapter()); // 19
+  Hive.registerAdapter(OpenClawConfigAdapter()); // 20
 
   await PrefStore.shared.init(); // Call this before accessing any store
   await Stores.init();
@@ -91,6 +108,11 @@ Future<void> _initData() async {
   await CodSessionStore.init();
   await CodConfigStore().init();
   await CodSkillStore.init();
+  await ChatProviderStore.init();
+  await ChatMessageStore.init();
+  await ChatConversationStore.init();
+  await McpServerStore.init();
+  await OpenClawStore.init();
 
   // DO NOT change the order of these providers.
   PrivateKeyProvider.instance.load();

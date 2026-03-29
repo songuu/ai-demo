@@ -18,8 +18,10 @@ import 'package:server_box/view/page/codecore/codecore_tab.dart';
 import 'package:server_box/view/page/codecore/widgets/claude_skill_page.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:server_box/view/page/storage/local.dart';
+import 'package:server_box/view/page/chat/chat_tab.dart';
 
 enum AppTab {
+  chat,
   codecore,
   skills,
   // server,
@@ -31,6 +33,7 @@ enum AppTab {
 
   Widget get page {
     return switch (this) {
+      chat => const ChatTab(),
       codecore => const CodePalTabPage(),
       skills => const ClaudeSkillPage(),
       // server => _getServerPage(),
@@ -52,6 +55,11 @@ enum AppTab {
 
   NavigationDestination get navDestination {
     return switch (this) {
+      chat => const NavigationDestination(
+          icon: Icon(Icons.chat_bubble_outline),
+          label: 'Chat',
+          selectedIcon: Icon(Icons.chat_bubble),
+        ),
       codecore => const NavigationDestination(
           icon: Icon(Icons.smart_toy_outlined),
           label: 'CodePal',

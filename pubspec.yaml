@@ -35,6 +35,9 @@ dependencies:
   flutter_reorderable_grid_view: ^5.1.0
   flutter_math_fork: ^0.7.4
   table_calendar: ^3.1.2
+  flutter_markdown: ^0.7.6
+  web_socket_channel: ^3.0.2
+  uuid: ^4.5.1
   # dartssh2 官方仓库当前不再提供 main 分支，这里改为使用 pub.dev 上发布的版本
   dartssh2: ^2.8.2
   circle_chart:
