@@ -19,11 +19,13 @@ import 'package:server_box/view/page/codecore/widgets/claude_skill_page.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:server_box/view/page/storage/local.dart';
 import 'package:server_box/view/page/chat/chat_tab.dart';
+import 'package:server_box/swarm/view/swarm_tab.dart';
 
 enum AppTab {
   chat,
   codecore,
   skills,
+  swarm,
   // server,
   // ssh,
   // file,
@@ -36,6 +38,7 @@ enum AppTab {
       chat => const ChatTab(),
       codecore => const CodePalTabPage(),
       skills => const ClaudeSkillPage(),
+      swarm => const SwarmTab(),
       // server => _getServerPage(),
       // //settings => const SettingsPage(),
       // ssh => const SSHTabPage(),
@@ -69,6 +72,11 @@ enum AppTab {
           icon: Icon(Icons.auto_awesome_outlined),
           label: 'Skills',
           selectedIcon: Icon(Icons.auto_awesome),
+        ),
+      swarm => const NavigationDestination(
+          icon: Icon(Icons.hub_outlined),
+          label: 'Swarm',
+          selectedIcon: Icon(Icons.hub),
         ),
       // server => NavigationDestination(
       //     icon: const Icon(BoxIcons.bx_server),

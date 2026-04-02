@@ -43,6 +43,12 @@ import 'package:server_box/data/provider/sftp.dart';
 import 'package:server_box/data/provider/snippet.dart';
 import 'package:server_box/data/res/build_data.dart';
 import 'package:server_box/data/res/store.dart';
+import 'package:server_box/swarm/model/agent_task.dart';
+import 'package:server_box/swarm/model/swarm_session.dart';
+import 'package:server_box/swarm/model/worktree.dart';
+import 'package:server_box/swarm/store/agent_task_store.dart';
+import 'package:server_box/swarm/store/swarm_session_store.dart';
+import 'package:server_box/swarm/store/worktree_store.dart';
 
 Future<void> main() async {
   _runInZone(() async {
@@ -101,6 +107,12 @@ Future<void> _initData() async {
   Hive.registerAdapter(ChatMessageAdapter()); // 18
   Hive.registerAdapter(McpServerConfigAdapter()); // 19
   Hive.registerAdapter(OpenClawConfigAdapter()); // 20
+  Hive.registerAdapter(SwarmSessionAdapter()); // 21
+  Hive.registerAdapter(AgentTaskAdapter()); // 22
+  Hive.registerAdapter(WorktreeAdapter()); // 23
+  Hive.registerAdapter(WorktreeStatusAdapter()); // 24
+  Hive.registerAdapter(AgentTaskStatusAdapter()); // 25
+  Hive.registerAdapter(SwarmSessionStatusAdapter()); // 26
 
   await PrefStore.shared.init(); // Call this before accessing any store
   await Stores.init();
@@ -113,6 +125,9 @@ Future<void> _initData() async {
   await ChatConversationStore.init();
   await McpServerStore.init();
   await OpenClawStore.init();
+  await WorktreeStore.init();
+  await AgentTaskStore.init();
+  await SwarmSessionStore.init();
 
   // DO NOT change the order of these providers.
   PrivateKeyProvider.instance.load();

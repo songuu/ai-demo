@@ -34,7 +34,6 @@ abstract final class Stores {
       final map = store.lastUpdateTs;
       if (map == null || map.isEmpty) continue;
       final maxTs = map.values.fold<int?>(null, (prev, cur) {
-        if (cur is! int) return prev;
         if (prev == null || cur > prev) return cur;
         return prev;
       });
